@@ -27,7 +27,8 @@ python measure_mcal_batch.py ${i}
 
 mv metacal_output_*fits /project2/chihway/data/decade/shearcat_v1/.
 rm -rf /scratch/midway2/chihway/delve_metacal/tile_${i}/decade.ncsa.illinois.edu
-
+rm /scratch/midway2/chihway/delve_metacal/tile_${i}/*py
+rm /scratch/midway2/chihway/delve_metacal/tile_${i}/tile_DR3_1_1.csv
 
 ">submit
 
