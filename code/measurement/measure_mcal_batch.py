@@ -19,7 +19,7 @@ path = metadata[1][2:-1]
 p = path[-3:]
 seed = 100
 
-dir_meds = '/scratch/midway2/chihway/delve_metacal/tile_'+i+'/decade.ncsa.illinois.edu/deca_archive/'+path+'/meds/'
+dir_meds = '/scratch/midway2/chihway/delve_metacal/tile_'+str(i)+'/decade.ncsa.illinois.edu/deca_archive/'+path+'/meds/'
 
 filename = [dir_meds+tile+'_r5918'+p+'_r_meds-delve.fits.fz',
             dir_meds+tile+'_r5918'+p+'_i_meds-delve.fits.fz',
