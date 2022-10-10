@@ -9,6 +9,7 @@ import fitsio
 import numpy as np
 import yaml
 import os
+import meds
 
 i = int(sys.argv[1])
 
@@ -32,4 +33,7 @@ output = run_metacal(filename, seed, mcal_config) #seed can be an integer, for i
 
 fitsio.write('metacal_output_'+tile+'.fits', output, clobber=True)
 
+
+X = meds.MEDS(filename[0])
+np.savez('ids_match_'+tile+'.npz', ids=X['id'])
 
