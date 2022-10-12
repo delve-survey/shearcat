@@ -15,6 +15,7 @@ p = path[-3:]
 dir_cat = '/project2/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/cat/'
 dir_wavg = '/project2/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/wavg/'
 
+data_det = fits.open(dir_cat+tile+'_r5918'+p+'_det_cat.fits')[1].data
 data_g = fits.open(dir_cat+tile+'_r5918'+p+'_g_cat.fits')[1].data
 data_r = fits.open(dir_cat+tile+'_r5918'+p+'_r_cat.fits')[1].data
 data_i = fits.open(dir_cat+tile+'_r5918'+p+'_i_cat.fits')[1].data
@@ -30,7 +31,10 @@ mask_SEflag = (data_g['FLAGS']<=3)*(data_r['FLAGS']<=3)*(data_i['FLAGS']<=3)*(da
 mask_IMAflag = (data_g['IMAFLAGS_ISO']==0)*(data_r['IMAFLAGS_ISO']==0)*(data_i['IMAFLAGS_ISO']==0)*(data_z['IMAFLAGS_ISO']==0)
 extend_coadd = np.array(((data_i_wavg['WAVG_SPREAD_MODEL']+3*data_i_wavg['WAVG_SPREADERR_MODEL'])>0.005))*1 + np.array((data_i_wavg['WAVG_SPREAD_MODEL']+data_i_wavg['WAVG_SPREADERR_MODEL'])>0.003) *1 + np.array((data_i_wavg['WAVG_SPREAD_MODEL']-data_i_wavg['WAVG_SPREADERR_MODEL'])>0.002)*1
 
-np.savez('gold_mask_'+tile+'.npz', maskSE=np.array(mask_SEflag), maskIMA=np.array(mask_IMAflag), maskSG=np.array(extend_coadd))
+ra = data_det['ALPHAWIN_J2000']
+dec = data_det['DELTAWIN_J2000']
+
+np.savez('gold_mask_'+tile+'.npz', maskSE=np.array(mask_SEflag), maskIMA=np.array(mask_IMAflag), maskSG=np.array(extend_coadd), ra=ra, dec=dec)
 
 
 os.system('rm -rf '+dir_cat)

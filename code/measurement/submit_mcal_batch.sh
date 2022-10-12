@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for ((i=0;i<100;i++))
+for ((i=81;i<100;i++))
 
 do
 echo $i
@@ -18,12 +18,12 @@ python download_tile.py ${i}
 
 echo "#!/bin/sh
 #SBATCH -t 10:00:00
-#SBATCH --partition=chihway
+#SBATCH --partition=broadwl
 #SBATCH --account=pi-chihway
 #SBATCH --job-name=metacal_${i}
 #SBATCH --exclusive
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=30
+##SBATCH --ntasks-per-node=28
 
 python measure_mcal_batch.py ${i}
 
