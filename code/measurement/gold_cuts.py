@@ -6,11 +6,17 @@ import os
 
 i = int(sys.argv[1])
 
-metadata = np.genfromtxt('tile_DR3_1_1.csv', dtype='str', delimiter=",")[1:][i]
+metadata = np.genfromtxt('tile_DR3_1_1_v2.csv', dtype='str', delimiter=",")[1:][i]
 
 tile = metadata[0][2:-1]
-path = metadata[1][2:-1]
+path = 'DEC_Taiga'+metadata[1][5:-1]
 p = path[-3:]
+
+#metadata = np.genfromtxt('tile_DR3_1_1.csv', dtype='str', delimiter=",")[1:][i]
+
+#tile = metadata[0][2:-1]
+#path = metadata[1][2:-1]
+#p = path[-3:]
 
 dir_cat = '/project2/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/cat/'
 dir_wavg = '/project2/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/wavg/'
@@ -33,8 +39,11 @@ extend_coadd = np.array(((data_i_wavg['WAVG_SPREAD_MODEL']+3*data_i_wavg['WAVG_S
 
 ra = data_det['ALPHAWIN_J2000']
 dec = data_det['DELTAWIN_J2000']
+flux_r = data_r['FLUX_AUTO']
+flux_i = data_i['FLUX_AUTO']
+flux_z = data_z['FLUX_AUTO']
 
-np.savez('gold_mask_'+tile+'.npz', maskSE=np.array(mask_SEflag), maskIMA=np.array(mask_IMAflag), maskSG=np.array(extend_coadd), ra=ra, dec=dec)
+np.savez('gold_mask_'+tile+'.npz', maskSE=np.array(mask_SEflag), maskIMA=np.array(mask_IMAflag), maskSG=np.array(extend_coadd), ra=ra, dec=dec, flux_r=flux_r, flux_i=flux_i, flux_z=flux_z)
 
 
 os.system('rm -rf '+dir_cat)

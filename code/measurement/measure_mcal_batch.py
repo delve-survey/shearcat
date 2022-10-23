@@ -13,12 +13,14 @@ import meds
 
 i = int(sys.argv[1])
 
-metadata = np.genfromtxt('tile_DR3_1_1.csv', dtype='str', delimiter=",")[1:][i]
+metadata = np.genfromtxt('tile_DR3_1_1_v2.csv', dtype='str', delimiter=",")[1:][i]
 
 tile = metadata[0][2:-1]
-path = metadata[1][2:-1]
+path = 'DEC_Taiga'+metadata[1][5:-1]
 p = path[-3:]
 seed = 100
+
+print(tile, path, p)
 
 dir_meds = '/scratch/midway2/chihway/delve_metacal/tile_'+str(i)+'/decade.ncsa.illinois.edu/deca_archive/'+path+'/meds/'
 
