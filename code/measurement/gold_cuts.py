@@ -9,8 +9,9 @@ i = int(sys.argv[1])
 metadata = np.genfromtxt('tile_DR3_1_1_v2.csv', dtype='str', delimiter=",")[1:][i]
 
 tile = metadata[0][2:-1]
-path = 'DEC_Taiga'+metadata[1][5:-1]
-p = path[-3:]
+path = 'DEC_Taiga'+metadata[1][5:-6]
+p = path[-4:-1]
+print(tile, path, p)
 
 #metadata = np.genfromtxt('tile_DR3_1_1.csv', dtype='str', delimiter=",")[1:][i]
 
