@@ -19,8 +19,8 @@ print(tile, path, p)
 #path = metadata[1][2:-1]
 #p = path[-3:]
 
-dir_cat = '/project2/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/cat/'
-dir_wavg = '/project2/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/wavg/'
+dir_cat = '/project/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/cat/'
+dir_wavg = '/project/chihway/data/decade/coaddcat_v1/decade.ncsa.illinois.edu/deca_archive/'+path+'/wavg/'
 
 data_det = fits.open(dir_cat+tile+'_r5918'+p+'_det_cat.fits')[1].data
 data_g = fits.open(dir_cat+tile+'_r5918'+p+'_g_cat.fits')[1].data
