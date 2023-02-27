@@ -1,0 +1,1 @@
+select m.tilename, fai.path from coadd i, (select distinct tilename from MADAMOW_DECADE.DR3_R1_2_IMAGE_TO_TILE) m, proctag t, file_archive_info fai where i.band='r' and i.filetype='coadd' and i.tilename=m.tilename and t.tag='DR3_1_2' and t.pfw_attempt_id=i.pfw_attempt_id and fai.filename=i.filename;
