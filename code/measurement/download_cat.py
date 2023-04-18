@@ -5,10 +5,11 @@ import sys
 
 i = int(sys.argv[1])
 
-metadata = np.genfromtxt('tile_DR3_1_1_v2.csv', dtype='str', delimiter=",")[1:][i]
+metadata = np.genfromtxt('/home/chihway/shearcat/Tilelist_DR3_1_1.csv', dtype='str', delimiter=",")[1:][i]
 
-tile = metadata[0][2:-1]
-path = 'DEC_Taiga'+metadata[1][5:-6]
+tile = metadata[0]
+path = 'DEC_Taiga'+metadata[1][3:-5]
+
 
 #metadata = np.genfromtxt('tile_DR3_1_1.csv', dtype='str', delimiter=",")[1:][i]
 
