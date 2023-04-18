@@ -2,7 +2,7 @@ import numpy as np
 import h5py
 from scipy import interpolate
 
-def compute_weights(SN, ToverTPSF, e1, e2, response):
+def compute_weights(SN, ToverTPSF, e1, e2, mcal_response):
     SN, ToverTPSF = None, None
 
     e1, e2 = None, None
@@ -32,7 +32,7 @@ def compute_weights(SN, ToverTPSF, e1, e2, response):
             ngal        = np.sum(total_mask)
 
             sigma_e_squared = 1/2*(np.sum(e1**2)/ngal**2 + np.sum(e2**2)/ngal**2)
-            mean_response   = np.mean(Response[total_mask])
+            mean_response   = np.mean(mcal_response[total_mask])
 
             sigma_gamma_squared = sigma_e_squared/mean_response**2
 
