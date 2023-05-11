@@ -69,7 +69,7 @@ def get_column(column):
         else:
             print('tile missing '+tile)
 
-        return np.concatenate(output, axis = 0)
+    return np.concatenate(output, axis = 0)
 
 def get_ra_dec():
 
@@ -114,7 +114,7 @@ def get_ra_dec():
         else:
             print('tile missing '+tile)
 
-        return np.concatenate(ra), np.concatenate(dec)
+    return np.concatenate(ra), np.concatenate(dec)
 
 
 with h5py.File(path, "w") as f:
