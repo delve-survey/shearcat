@@ -120,7 +120,7 @@ def get_ra_dec():
 with h5py.File(path, "w") as f:
 
     for c in columns:
-        f.create_dataset(c, data = get_column(filelist, c))
+        f.create_dataset(c, data = get_column(c))
 
     #Now add ra_dec
 
