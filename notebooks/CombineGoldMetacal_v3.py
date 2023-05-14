@@ -32,6 +32,53 @@ coadd_dir = '/project2/chihway/data/decade/coaddcat_v2/'
 
 path = '/project2/chihway/data/decade/metacal_test_20230323_V2.hdf'
 
+
+GOLD_Mask = {}
+ra  = []
+dec = []
+
+for i in tqdm(range(6357), desc = 'Build GoldMask & RADEC'): #6357
+
+    tile = metadata[i][0]
+
+    if os.path.exists(shear_dir+'metacal_output_'+tile+'.fits') and os.path.exists(coadd_dir+'gold_mask_'+tile+'.npz'):
+
+        fits = fitsio.FITS(shear_dir+'metacal_output_'+tile+'.fits')
+
+        shear_cat = fits[1].read(vstorage='object')
+        # metacal output files, it has an ID that is the correct coadd IDs, but already
+        # with a cut that only includes objects that have a metacal measurement
+
+        shear_id = np.load(shear_dir+'ids_match_'+tile+'.npz', allow_pickle=True)
+        # ad hoc file we save when running metacal, the full list of coadd IDs for all objects in the MEDS file
+        # these are row-by-row matched to the catalog files that contain e.g. photometry
+
+        gold_mask = np.load(coadd_dir+'gold_mask_'+tile+'.npz', allow_pickle=True)
+        gold_mask_full = gold_mask['maskSE'] & gold_mask['maskIMA'] & (gold_mask['maskSG']>=2)
+        # from the catalog files, we make the gold cut
+        # still using rough star/galaxy separation
+
+        shear_id_masked_gold = shear_id['ids'][gold_mask_full]
+        # this is IDs of all the objects that pass the gold cut
+
+        mask_joint = np.in1d(shear_cat['id'], shear_id_masked_gold)
+        # mask to apply on the metacal catalog, to remove objects that don't pass the gold cut
+
+        mask_joint_invert = np.in1d(shear_id_masked_gold, shear_cat['id'][mask_joint])
+        # invert mask to apply to the original tile catalog, to selecout the final objects
+
+        ra_tmp  = gold_mask['ra'][gold_mask_full][mask_joint_invert]
+        dec_tmp = gold_mask['dec'][gold_mask_full][mask_joint_invert]
+
+        ra.append(ra_tmp)
+        dec.append(dec_tmp)
+        
+        GOLD_Mask[tile] = mask_joint
+
+    else:
+        print('tile missing '+tile)
+
+
 def get_column(column):
 
     output = []
@@ -39,82 +86,22 @@ def get_column(column):
 
         tile = metadata[i][0]
 
-        if os.path.exists(shear_dir+'metacal_output_'+tile+'.fits') and os.path.exists(coadd_dir+'gold_mask_'+tile+'.npz'):
+        if os.path.exists(shear_dir+'metacal_output_'+tile+'.fits') and os.path.exists(coadd_dir+'gold_mask_'+tile+'.npz'): 
+            
             fits = fitsio.FITS(shear_dir+'metacal_output_'+tile+'.fits')
-
             shear_cat = fits[1].read(vstorage='object')
-            # metacal output files, it has an ID that is the correct coadd IDs, but already
-            # with a cut that only includes objects that have a metacal measurement
-
-            shear_id = np.load(shear_dir+'ids_match_'+tile+'.npz', allow_pickle=True)
-            # ad hoc file we save when running metacal, the full list of coadd IDs for all objects in the MEDS file
-            # these are row-by-row matched to the catalog files that contain e.g. photometry
-
-            gold_mask = np.load(coadd_dir+'gold_mask_'+tile+'.npz', allow_pickle=True)
-            gold_mask_full = gold_mask['maskSE']*gold_mask['maskIMA']*(gold_mask['maskSG']>=2)
-            # from the catalog files, we make the gold cut
-            # still using rough star/galaxy separation
-
-            shear_id_masked_gold = shear_id['ids'][gold_mask_full]
-            # this is IDs of all the objects that pass the gold cut
-
-            mask_joint = np.in1d(shear_cat['id'], shear_id_masked_gold)
-            # mask to apply on the metacal catalog, to remove objects that don't pass the gold cut
-
-            mask_joint_invert = np.in1d(shear_id_masked_gold, shear_cat['id'][mask_joint])
-            # invert mask to apply to the original tile catalog, to selecout the final objects
-
-            output.append(shear_cat[column][mask_joint])
-
-        else:
-            print('tile missing '+tile)
+        
+            arr = shear_cat[column][GOLD_Mask[tile]]
+            
+            #Monkey hacking because ccdnum and x_exp/y_exp has too large a datatype
+            if column == 'ccdnum':
+                arr = arr.astype(np.int16)
+            elif (column == 'x_exp') | (column == 'y_exp'):
+                arr = arr.astype(np.float32)
+            
+            output.append(arr)
 
     return np.concatenate(output, axis = 0)
-
-def get_ra_dec():
-
-    ra  = []
-    dec = []
-
-    for i in tqdm(range(6357), desc = 'RADEC'): #6357
-
-        tile = metadata[i][0]
-
-        if os.path.exists(shear_dir+'metacal_output_'+tile+'.fits') and os.path.exists(coadd_dir+'gold_mask_'+tile+'.npz'):
-            fits = fitsio.FITS(shear_dir+'metacal_output_'+tile+'.fits')
-
-            shear_cat = fits[1].read(vstorage='object')
-            # metacal output files, it has an ID that is the correct coadd IDs, but already
-            # with a cut that only includes objects that have a metacal measurement
-
-            shear_id = np.load(shear_dir+'ids_match_'+tile+'.npz', allow_pickle=True)
-            # ad hoc file we save when running metacal, the full list of coadd IDs for all objects in the MEDS file
-            # these are row-by-row matched to the catalog files that contain e.g. photometry
-
-            gold_mask = np.load(coadd_dir+'gold_mask_'+tile+'.npz', allow_pickle=True)
-            gold_mask_full = gold_mask['maskSE']*gold_mask['maskIMA']*(gold_mask['maskSG']>=2)
-            # from the catalog files, we make the gold cut
-            # still using rough star/galaxy separation
-
-            shear_id_masked_gold = shear_id['ids'][gold_mask_full]
-            # this is IDs of all the objects that pass the gold cut
-
-            mask_joint = np.in1d(shear_cat['id'], shear_id_masked_gold)
-            # mask to apply on the metacal catalog, to remove objects that don't pass the gold cut
-
-            mask_joint_invert = np.in1d(shear_id_masked_gold, shear_cat['id'][mask_joint])
-            # invert mask to apply to the original tile catalog, to selecout the final objects
-
-            ra_tmp = gold_mask['ra'][gold_mask_full][mask_joint_invert]
-            dec_tmp = gold_mask['dec'][gold_mask_full][mask_joint_invert]
-
-            ra.append(ra_tmp)
-            dec.append(dec_tmp)
-
-        else:
-            print('tile missing '+tile)
-
-    return np.concatenate(ra), np.concatenate(dec)
 
 
 with h5py.File(path, "w") as f:
@@ -123,9 +110,17 @@ with h5py.File(path, "w") as f:
         f.create_dataset(c, data = get_column(c))
 
     #Now add ra_dec
+    f.create_dataset('ra',  data = np.concatenate(ra))
+    f.create_dataset('dec', data = np.concatenate(dec))
 
-    ra, dec = get_ra_dec()
-    f.create_dataset('ra',  data = ra)
-    f.create_dataset('dec', data = dec)
+
+# with h5py.File(path, "r") as f:
+
+#     for c in ['ccdnum', 'x_exp', 'y_exp']:
+#         f.create_dataset(c, data = get_column(c))
+
+#     #Now add ra_dec
+#     f.create_dataset('ra',  data = np.concatenate(ra))
+#     f.create_dataset('dec', data = np.concatenate(dec))
 
 print(time.ctime())
