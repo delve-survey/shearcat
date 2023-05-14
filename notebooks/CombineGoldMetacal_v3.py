@@ -93,7 +93,8 @@ def get_column(column):
         
             arr = shear_cat[column][GOLD_Mask[tile]]
             
-            #Monkey hacking because ccdnum and x_exp/y_exp has too large a datatype
+            #Hardcoding this in because ccdnum and x_exp/y_exp has too large a datatype
+            #Wont have enough memory to create the final array (more than 50GB).
             if column == 'ccdnum':
                 arr = arr.astype(np.int16)
             elif (column == 'x_exp') | (column == 'y_exp'):
@@ -113,14 +114,5 @@ with h5py.File(path, "w") as f:
     f.create_dataset('ra',  data = np.concatenate(ra))
     f.create_dataset('dec', data = np.concatenate(dec))
 
-
-# with h5py.File(path, "r") as f:
-
-#     for c in ['ccdnum', 'x_exp', 'y_exp']:
-#         f.create_dataset(c, data = get_column(c))
-
-#     #Now add ra_dec
-#     f.create_dataset('ra',  data = np.concatenate(ra))
-#     f.create_dataset('dec', data = np.concatenate(dec))
 
 print(time.ctime())
