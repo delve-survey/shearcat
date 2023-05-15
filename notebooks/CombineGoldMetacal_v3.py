@@ -37,7 +37,7 @@ GOLD_Mask = {}
 ra  = []
 dec = []
 
-for i in tqdm(range(6357), desc = 'Build GoldMask & RADEC'): #6357
+for i in tqdm(range(6537), desc = 'Build GoldMask & RADEC'): #6357
 
     tile = metadata[i][0]
 
