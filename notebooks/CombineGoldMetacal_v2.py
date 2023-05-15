@@ -29,7 +29,8 @@ Columns = ['dec', 'badfrac', 'id',
 shear_dir = '/project2/chihway/data/decade/shearcat_v2/'
 coadd_dir = '/project2/chihway/data/decade/coaddcat_v2/'
 
-path = '/project2/chihway/data/decade/metacal_test_20230323.hdf'
+#path = '/project2/chihway/data/decade/metacal_test_20230323.hdf'
+path = '/scratch/midway2/chihway/metacal_test_20230427.hdf'
 
 with h5py.File(path, "w") as f:
 
@@ -42,16 +43,27 @@ with h5py.File(path, "w") as f:
             Ndim = len(test_fits[1].read(vstorage='object')[col].shape)
             if Ndim==1:
                 type_col = str(type(test_fits[1].read(vstorage='object')[col][0])).replace('class', '').replace("< '", "").replace("'>", "").replace("numpy.", "")
-                f.create_dataset(col, data = [], chunks=(10**4,), maxshape = (None,), dtype=type_col)
+                f.create_dataset(col, data = [], chunks=(10**5,), maxshape = (None,), dtype=type_col)
             if Ndim==2:
                 type_col = str(type(test_fits[1].read(vstorage='object')[col][0][0])).replace('class', '').replace("< '", "").replace("'>", "").replace("numpy.", "")
-                f.create_dataset(col, data = [[]], chunks=((10**4,20)), maxshape = (None,20), dtype=type_col)
+                f.create_dataset(col, data = [[]], chunks=((10**5,20)), maxshape = (None,20), dtype=type_col)
             if Ndim==3:
                 type_col = str(type(test_fits[1].read(vstorage='object')[col][0][0][0])).replace('class', '').replace("< '", "").replace("'>", "").replace("numpy.", "")
-                f.create_dataset(col, data = [[[]]], chunks=((10**4,20,20)), maxshape = (None,20,20), dtype=type_col)
+                f.create_dataset(col, data = [[[]]], chunks=((10**5,20,20)), maxshape = (None,20,20), dtype=type_col)
 
-    f.create_dataset('ra', data = [], chunks=(10**4,), maxshape = (None,))            
-    f.create_dataset('dec', data = [], chunks=(10**4,), maxshape = (None,))            
+#            if Ndim==1:
+#                type_col = str(type(test_fits[1].read(vstorage='object')[col][0])).replace('class', '').replace("< '", "").replace("'>", "").replace("numpy.", "")
+#                f.create_dataset(col, data = [], chunks=(10**4,), maxshape = (None,), dtype=type_col)
+#            if Ndim==2:
+#                type_col = str(type(test_fits[1].read(vstorage='object')[col][0][0])).replace('class', '').replace("< '", "").replace("'>", "").replace("numpy.", "")
+#                f.create_dataset(col, data = [[]], chunks=((10**4,20)), maxshape = (None,20), dtype=type_col)
+#            if Ndim==3:
+#                type_col = str(type(test_fits[1].read(vstorage='object')[col][0][0][0])).replace('class', '').replace("< '", "").replace("'>", "").replace("numpy.", "")
+#                f.create_dataset(col, data = [[[]]], chunks=((10**4,20,20)), maxshape = (None,20,20), dtype=type_col)
+
+
+    f.create_dataset('ra', data = [], chunks=(10**5,), maxshape = (None,))            
+    f.create_dataset('dec', data = [], chunks=(10**5,), maxshape = (None,))            
 
     # Appends new_data array into existing dataset
     def add_data(dataset, new_data):
@@ -75,7 +87,7 @@ with h5py.File(path, "w") as f:
             dataset[-len(new_data):] = new_data
 
 
-    for i in range(6357): #6357
+    for i in range(6537): #6537
         tile = metadata[i][0]
         print(tile)
 
@@ -115,9 +127,16 @@ with h5py.File(path, "w") as f:
                     add_data(f[col2], data2)
                     if col2=='id':
                         print(i, len(f[col2]))
+                        out2 = open("good_tiles.txt", "a")
+                        out2.write(str(i)+'\t'+tile+'\t'+str(len(f[col2]))+'\n')
+                        out2.close()
+
 
         else:
             print('tile missing '+tile)
+            out = open("bad_tiles.txt", "a")
+            out.write(str(i)+'\t'+tile+'\n')
+            out.close()
 
 print(time.ctime())
 

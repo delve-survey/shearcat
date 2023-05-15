@@ -30,7 +30,7 @@ columns = [#'dec',  'ra', #Not using ra dec here as we'll add it manually later 
 shear_dir = '/project2/chihway/data/decade/shearcat_v2/'
 coadd_dir = '/project2/chihway/data/decade/coaddcat_v2/'
 
-path = '/project2/chihway/data/decade/metacal_test_20230323_V2.hdf'
+path = '/project2/chihway/data/decade/metacal_test_20230427_v2.hdf'
 
 
 GOLD_Mask = {}
@@ -75,9 +75,15 @@ for i in tqdm(range(6357), desc = 'Build GoldMask & RADEC'): #6357
         
         GOLD_Mask[tile] = mask_joint
 
+        out2 = open("good_tiles.txt", "a")
+        out2.write(str(i)+'\t'+tile+'\n')
+        out2.close()
+
     else:
         print('tile missing '+tile)
-
+        out = open("bad_tiles.txt", "a")
+        out.write(str(i)+'\t'+tile+'\n')
+        out.close()
 
 def get_column(column):
 
