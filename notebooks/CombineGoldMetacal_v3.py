@@ -30,7 +30,7 @@ columns = [#'dec',  'ra', #Not using ra dec here as we'll add it manually later 
 shear_dir = '/project2/chihway/data/decade/shearcat_v2/'
 coadd_dir = '/project2/chihway/data/decade/coaddcat_v2/'
 
-path = '/project2/chihway/data/decade/metacal_test_20230427_v2.hdf'
+path = '/project2/chihway/data/decade/metacal_test_20230427_v3.hdf'
 
 
 GOLD_Mask = {}
@@ -88,7 +88,7 @@ for i in tqdm(range(6537), desc = 'Build GoldMask & RADEC'): #6357
 def get_column(column):
 
     output = []
-    for i in tqdm(range(6357), desc = column): #6357
+    for i in tqdm(range(6537), desc = column): #6357
 
         tile = metadata[i][0]
 
