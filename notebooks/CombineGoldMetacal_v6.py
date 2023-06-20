@@ -41,18 +41,26 @@ def get_column_mcal(column):
 
     output = []
 
-#    for i in tqdm(range(Ntile1), desc = column): 
+    for i in tqdm(range(Ntile1), desc = column): 
 
- #       tile = metadata1[i][0]
+        tile = metadata1[i][0]
 
- #       if os.path.exists(shear_dir1+'metacal_output_'+tile+'.fits'):
+        if os.path.exists(shear_dir1+'metacal_output_'+tile+'.fits'):
             
  #           fits = fitsio.FITS(shear_dir1+'metacal_output_'+tile+'.fits')
  #           shear_cat = fits[1].read(vstorage='object')
-        
- #           arr = shear_cat[column]
+ 
+            shear_cat = pf.open(shear_dir1+'metacal_output_'+tile+'.fits')
+            arr = shear_cat[1].data[column][:].copy()
+            shear_cat.close()
+            del shear_cat
+       
+ #           arr = shear_cat[column][:]
+            if column!= 'id':
+                arr.astype(np.float32)
 
- #           output.append(arr)
+            output.append(arr)
+            del arr
 
     for i in tqdm(range(Ntile2), desc = column):
 
@@ -60,12 +68,19 @@ def get_column_mcal(column):
 
         if os.path.exists(shear_dir2+'metacal_output_'+tile+'.fits'):
 
-            fits = fitsio.FITS(shear_dir2+'metacal_output_'+tile+'.fits')
-            shear_cat = fits[1].read(vstorage='object')
+            #fits = fitsio.FITS(shear_dir2+'metacal_output_'+tile+'.fits')
+            #shear_cat = fits[1].read(vstorage='object')
 
-            arr = shear_cat[column]
+            shear_cat = pf.open(shear_dir2+'metacal_output_'+tile+'.fits')
+            arr = shear_cat[1].data[column][:].copy()
+            shear_cat.close()
+            del shear_cat            
+
+            if column!= 'id':
+                arr.astype(np.float32)
 
             output.append(arr)
+            del arr
 
     return np.concatenate(output, axis = 0)
 
@@ -78,5 +93,6 @@ with h5py.File(path, "w") as f:
 
 
 print(time.ctime())
+
 
 

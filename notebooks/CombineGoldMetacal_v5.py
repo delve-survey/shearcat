@@ -1,3 +1,5 @@
+# this is the final script for DR3_1_1
+
 import numpy as np
 import sys
 import os
@@ -28,8 +30,8 @@ columns_mcal = ['badfrac', 'id',
             #, 'x_exp', 'y_exp']
 
 columns_gold = ['COADD_OBJECT_ID', 'RA', 'DEC',
-           'MAG_AUTO_G', 'MAG_AUTO_R', 'MAG_AUTO_I', 'MAG_AUTO_Z', 
-           'MAGERR_AUTO_G', 'MAGERR_AUTO_R', 'MAGERR_AUTO_I', 'MAGERR_AUTO_Z', 
+           'FLUX_AUTO_G', 'FLUX_AUTO_R', 'FLUX_AUTO_I', 'FLUX_AUTO_Z', 
+           'FLUXERR_AUTO_G', 'FLUXERR_AUTO_R', 'FLUXERR_AUTO_I', 'FLUXERR_AUTO_Z', 
            'FLUX_RADIUS_G', 'FLUX_RADIUS_R', 'FLUX_RADIUS_I', 'FLUX_RADIUS_Z', 
            'BDF_FLUX_G', 'BDF_FLUX_R', 'BDF_FLUX_I', 'BDF_FLUX_Z',  
            'BDF_FLUX_ERR_G', 'BDF_FLUX_ERR_R', 'BDF_FLUX_ERR_I', 'BDF_FLUX_ERR_Z', 'BDF_T', 'BDF_S2N'] #SG
@@ -38,7 +40,7 @@ columns_gold = ['COADD_OBJECT_ID', 'RA', 'DEC',
 shear_dir = '/project2/chihway/data/decade/shearcat_v2/'
 gold_dir = '/project2/chihway/data/decade/coaddcat_v3/'
 
-path = '/project2/chihway/data/decade/metacal_gold_combined_20230531.hdf'
+path = '/project2/chihway/data/decade/metacal_gold_combined_20230613.hdf'
 
 Ntile = 6537
 
