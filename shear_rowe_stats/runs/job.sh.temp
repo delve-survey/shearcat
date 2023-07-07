@@ -1,0 +1,30 @@
+#!/bin/bash
+#SBATCH --job-name rowe_stats_{{ start }}_to_{{ end }}
+#SBATCH --partition=chihway
+#SBATCH --account=pi-chihway
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=40
+#SBATCH --time=05:00:00
+#SBATCH --output=/home/dhayaa/Desktop/DECADE/shearcat/code/rowe_stats/runs/%x.log
+#SBATCH --mail-user=dhayaa@uchicago.edu
+#SBATCH --mail-type=BEGIN,END
+
+
+if [ "$USER" == "dhayaa" ]
+then
+    cd /home/dhayaa/Desktop/DECADE/shearcat/
+    module load python
+    conda activate shearDM
+    source /home/dhayaa/Desktop/DECADE/bash_profile.sh
+fi
+
+
+NOW=$( date '+%H:%M:%S' )
+echo "Starting measure stage at $NOW"
+
+
+python $ROWE_STATS_RUN_DIR/run_measurements.py run \
+                                    --start="{{ start }}" \
+                                    --end="{{ end }}" \
+                                    --path-to-explist="{{ path_to_explist }}" \
+                                    --seed="{{ seed }}"
