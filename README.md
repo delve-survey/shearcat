@@ -2,7 +2,16 @@
 
 DECADE shear catalog tests and paper
 
-```shear_catalog''' contains all code used to measure + compile the shear catalog
-```shear_rowe_stats''' contains the code for testing PSF impacts on shear
-```shear_tests''' contains code for all other tests done on shear
-```utils''' contains common tools used across our analyses. 
+Guide to the directories:
+
+**SHEAR_CATALOG:** contains all code used to measure + compile the shear catalog
+
+**SHEAR_ROWE_STATS:** contains the code for testing PSF impacts on shear
+
+**SHEAR_TEST:** contains code for all other tests done on shear
+
+**NOTEBOOKS:** any notebooks we run and want to share
+
+**PAPER_PLOTS:** notebooks/scripts that generate the final plots used in paper (where applicable)
+
+**UTILS:** contains common tools used across our analyses. 
