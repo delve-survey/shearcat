@@ -1,0 +1,1 @@
+select i.tilename, fai.path, i.RA_CENT, i.DEC_CENT from coadd i, proctag t, file_archive_info fai where i.filetype='coadd_det' and t.tag='DR3_1_2_ASTROFIX' and t.pfw_attempt_id=i.pfw_attempt_id and fai.filename=i.filename; > Tilelist_DR3_1_2_ASTROFIX.csv
