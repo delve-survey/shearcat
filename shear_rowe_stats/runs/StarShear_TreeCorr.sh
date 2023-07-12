@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=28
 #SBATCH --time=30:00:00
-#SBATCH --output=/home/dhayaa/Desktop/DECADE/shearcat/code/rowe_stats/runs/%x.log
+#SBATCH --output=/home/dhayaa/Desktop/DECADE/shearcat/shear_rowe_stats/runs/%x.log
 #SBATCH --mail-user=dhayaa@uchicago.edu
 #SBATCH --mail-type=BEGIN,END
 
@@ -26,20 +26,22 @@ echo "Starting measure stage at $NOW"
 
 python -u $ROWE_STATS_RUN_DIR/star_shear_treecorring.py --gal_cat_path $shearcatalog \
                                                    --psf_cat_path $psfcatalog \
-                                                   --Name Faint_d03072023 \
+                                                   --Name Faint_d03072023_SNR80 \
                                                    --min_angle 3 \
                                                    --max_angle 250 \
                                                    --nbins 25 \
                                                    --bin_slop 0.001 \
-                                                   --m_min 16.5
+                                                   --m_min 16.5 \
+                                                   --SNRCut 80
 
 
 python -u $ROWE_STATS_RUN_DIR/star_shear_treecorring.py --gal_cat_path $shearcatalog \
                                                    --psf_cat_path $psfcatalog \
-                                                   --Name Bright_d03072023 \
+                                                   --Name Bright_d03072023_SNR80 \
                                                    --min_angle 3 \
                                                    --max_angle 250 \
                                                    --nbins 25 \
                                                    --bin_slop 0.001 \
-                                                   --m_max 16.5
+                                                   --m_max 16.5 \
+                                                   --SNRCut 80
 

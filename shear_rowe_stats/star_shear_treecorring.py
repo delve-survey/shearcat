@@ -144,9 +144,10 @@ if __name__ == '__main__':
     psf_w = weight_map[pix] #Assign individual stars weights from the map
     
     #Remove stars that are not in the galaxy sample's footprint
-    Mask     = psf_w <= 0
+    Mask     = psf_w > 0
     psf_ra   = psf_ra[Mask]
     psf_dec  = psf_dec[Mask]
+    psf_w    = psf_w[Mask]
     
     del pix, star, galaxy, idx_rep, idx
     
