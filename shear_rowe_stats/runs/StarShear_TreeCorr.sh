@@ -24,24 +24,26 @@ psfcatalog=/project/chihway/dhayaa/DECADE/star_psf_shapecatalog_20230510.hdf5
 NOW=$( date '+%H:%M:%S' )
 echo "Starting measure stage at $NOW"
 
-python -u $ROWE_STATS_RUN_DIR/star_shear_treecorring.py --gal_cat_path $shearcatalog \
+for SNR in 40 80 160;
+do
+    python -u $ROWE_STATS_RUN_DIR/star_shear_treecorring.py --gal_cat_path $shearcatalog \
                                                    --psf_cat_path $psfcatalog \
-                                                   --Name Faint_d03072023_SNR80 \
+                                                   --Name Faint_d03072023_SNR${SNR} \
                                                    --min_angle 3 \
                                                    --max_angle 250 \
                                                    --nbins 25 \
                                                    --bin_slop 0.001 \
                                                    --m_min 16.5 \
-                                                   --SNRCut 80
+                                                   --SNRCut ${SNR}
 
 
-python -u $ROWE_STATS_RUN_DIR/star_shear_treecorring.py --gal_cat_path $shearcatalog \
+    python -u $ROWE_STATS_RUN_DIR/star_shear_treecorring.py --gal_cat_path $shearcatalog \
                                                    --psf_cat_path $psfcatalog \
-                                                   --Name Bright_d03072023_SNR80 \
+                                                   --Name Bright_d03072023_SNR${SNR} \
                                                    --min_angle 3 \
                                                    --max_angle 250 \
                                                    --nbins 25 \
                                                    --bin_slop 0.001 \
                                                    --m_max 16.5 \
-                                                   --SNRCut 80
-
+                                                   --SNRCut ${SNR}
+done;
