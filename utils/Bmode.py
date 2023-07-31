@@ -25,8 +25,8 @@ class MakeMapFromCat(object):
             
             self.weight_map = np.ones_like(self.n_map)
         else:
-            self.weight_map =  self.n_map.copy()
-            self.weight_map[self.unique_pix] /= np.bincount(self.idx_rep) #Get mean weight per pixel
+            self.weight_map = self.n_map.copy()
+            #self.weight_map[self.unique_pix] /= np.bincount(self.idx_rep) #Get mean weight per pixel
             
             
         #Only select pixels where we have at least a single galaxy
@@ -185,7 +185,7 @@ if __name__ == '__main__':
     my_parser.add_argument('--Nrands',    action='store', type = int, default = 100)
     my_parser.add_argument('--DECADE',    action='store_true', dest = 'DECADE')
     my_parser.add_argument('--DES',       action='store_true', dest = 'DES')
-    my_parser.add_argument('--Foreground_Mask', action='store', type = str, default = '/project2/chihway/dhayaa/DECADE/Gold_Foreground_20230607.fits')
+    my_parser.add_argument('--Foreground_Mask', action='store', type = str, default = '/project/chihway/dhayaa/DECADE/Gold_Foreground_20230607.fits')
     
 
     args  = vars(my_parser.parse_args())
@@ -194,7 +194,7 @@ if __name__ == '__main__':
     npix  = hp.nside2npix(nside)
 
     if args['DECADE']:
-        with h5py.File('/project2/chihway/data/decade/metacal_gold_combined_20230531.hdf', 'r') as f:
+        with h5py.File('/project/chihway/data/decade/metacal_gold_combined_20230613.hdf', 'r') as f:
 
             ra      = np.array(f['RA'])
             dec     = np.array(f['DEC'])
@@ -239,6 +239,8 @@ if __name__ == '__main__':
             ra  = ra[Mask]
             dec = dec[Mask]
             w   = w[Mask]
+            
+            w = None #Not using masks for now
 
             del SNR_Mask, Tratio_Mask,T_Mask, Flag_Mask, Other_Mask, GOLD_Mask, SG_Mask, Mask
             del mag_r, SNR, T_ratio, T, flags, FLAGS_Foreground, GOLD_Foreground
