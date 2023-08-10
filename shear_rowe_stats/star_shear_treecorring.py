@@ -78,7 +78,7 @@ if __name__ == '__main__':
         gal_g2  = gal_g2[Mask]
         gal_ra  = gal_ra[Mask]
         gal_dec = gal_dec[Mask]
-        gal_w   = gal_w[Mask]
+        gal_w   = None #gal_w[Mask]
 
         del mag_r, SNR, T_ratio, T, flags, foreg, stargal, SNR_Mask, Tratio_Mask, T_Mask, Flag_Mask, FG_Mask, sg_Mask, Other_Mask, Mask
 
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     
     
     #NOW COMPUTE STAR WEIGHTS
-    NSIDE  = 512
+    NSIDE  = 32
     star   = np.zeros(hp.nside2npix(NSIDE))
     galaxy = np.zeros(hp.nside2npix(NSIDE))
 
