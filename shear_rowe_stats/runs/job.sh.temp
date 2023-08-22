@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=40
 #SBATCH --time=05:00:00
-#SBATCH --output=/home/dhayaa/Desktop/DECADE/shearcat/code/rowe_stats/runs/%x.log
+#SBATCH --output=/home/dhayaa/Desktop/DECADE/shearcat/shear_rowe_stats/runs/%x.log
 #SBATCH --mail-user=dhayaa@uchicago.edu
 #SBATCH --mail-type=BEGIN,END
 
@@ -22,6 +22,8 @@ fi
 NOW=$( date '+%H:%M:%S' )
 echo "Starting measure stage at $NOW"
 
+export ROWE_STATS_DIR=/scratch/midway3/dhayaa/ROWE_STATS_DIR
+export EXP_DIR=/scratch/midway3/dhayaa/EXP_DIR
 
 python $ROWE_STATS_RUN_DIR/run_measurements.py run \
                                     --start="{{ start }}" \
