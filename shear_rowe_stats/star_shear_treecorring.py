@@ -52,7 +52,7 @@ if __name__ == '__main__':
         gal_w   = np.array(f['mcal_g_w'])
         gal_w   = np.ones_like(gal_w)
         gal_g1, gal_g2  = np.array(f['mcal_g_noshear']).T
-        mag_r = 30 -2.5*np.log10(np.array(f['mcal_flux_noshear'])[:, 0])
+        mag_r = 30 - 2.5*np.log10(np.array(f['mcal_flux_noshear'])[:, 0])
 
         SNR     = np.array(f['mcal_s2n_noshear'])
         T_ratio = np.array(f['mcal_T_ratio_noshear'])
@@ -78,7 +78,7 @@ if __name__ == '__main__':
         gal_g2  = gal_g2[Mask]
         gal_ra  = gal_ra[Mask]
         gal_dec = gal_dec[Mask]
-        gal_w   = None #gal_w[Mask]
+        gal_w   = gal_w[Mask]
 
         del mag_r, SNR, T_ratio, T, flags, foreg, stargal, SNR_Mask, Tratio_Mask, T_Mask, Flag_Mask, FG_Mask, sg_Mask, Other_Mask, Mask
 
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     
     
     #NOW COMPUTE STAR WEIGHTS
-    NSIDE  = 32
+    NSIDE  = 128
     star   = np.zeros(hp.nside2npix(NSIDE))
     galaxy = np.zeros(hp.nside2npix(NSIDE))
 
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     psf_ra   = psf_ra[Mask]
     psf_dec  = psf_dec[Mask]
     psf_w    = psf_w[Mask]
-    
+    #psf_w    = np.ones_like(psf_w)    
     del pix, star, galaxy, idx_rep, idx
     
     
@@ -161,6 +161,7 @@ if __name__ == '__main__':
     hpix = hp.ang2pix(NSIDE, theta, phi)
     pix_mask   = weight_map[hpix] > 0
     phi, theta = phi[pix_mask], theta[pix_mask]
+    rand_w     = weight_map[hpix][pix_mask]
 
     #convert to RA and DEC
     rand_ra  = phi*180/np.pi
@@ -170,12 +171,12 @@ if __name__ == '__main__':
     
     #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
     cat_g = treecorr.Catalog(g1 = gal_g1, g2 = gal_g2, ra = gal_ra, dec = gal_dec, w = gal_w, ra_units='deg', dec_units='deg', patch_centers=center_path)
-    cat_s = treecorr.Catalog(ra = psf_ra,  dec = psf_dec,  w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
-    cat_r = treecorr.Catalog(ra = rand_ra, dec = rand_dec, ra_units='deg',dec_units='deg', patch_centers=center_path)
+    cat_s = treecorr.Catalog(ra = psf_ra,  dec = psf_dec,  w = psf_w,  ra_units='deg',dec_units='deg', patch_centers=center_path)
+    cat_r = treecorr.Catalog(ra = rand_ra, dec = rand_dec, w = rand_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
     
     del gal_g1, gal_g2, gal_ra, gal_dec, gal_w
     del psf_ra, psf_dec, psf_w
-    del rand_ra, rand_dec
+    del rand_ra, rand_dec, rand_w
     
     #Compute the rowe stats
     NG = treecorr.NGCorrelation(nbins = args['nbins'], min_sep = args['min_angle'], max_sep = args['max_angle'],

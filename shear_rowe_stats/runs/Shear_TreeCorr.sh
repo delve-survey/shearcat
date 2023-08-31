@@ -1,10 +1,14 @@
 #!/bin/bash
 #SBATCH --job-name TreeCorr
-#SBATCH --partition=chihway
+##SBATCH --partition=chihway
+#SBATCH --partition=caslake
+#SBATCH --qos=debug
 #SBATCH --account=pi-chihway
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=40
-#SBATCH --time=40:00:00
+##SBATCH --ntasks-per-node=40
+##SBATCH --time=40:00:00
+#SBATCH --ntasks-per-node=2
+#SBATCH --time=00:15:00
 #SBATCH --output=/home/dhayaa/Desktop/DECADE/shearcat/code/rowe_stats/runs/%x.log
 #SBATCH --mail-user=dhayaa@uchicago.edu
 #SBATCH --mail-type=BEGIN,END

@@ -44,6 +44,7 @@ if __name__ == '__main__':
         gal_ra  = np.array(f['RA'])
         gal_dec = np.array(f['DEC'])
         gal_w   = np.array(f['mcal_g_w'])
+        #gal_w   = np.ones_like(gal_w)
         gal_g1, gal_g2  = np.array(f['mcal_g_noshear']).T
         mag_r = 30 -2.5*np.log10(np.array(f['mcal_flux_noshear'])[:, 0])
 
@@ -155,7 +156,7 @@ if __name__ == '__main__':
     weight_map[star != 0] = galaxy[star != 0]/star[star != 0]
 
     psf_w = weight_map[pix] #Assign individual stars weights from the map
-
+    #psf_w = np.ones_like(psf_w)
 
     #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
     cat_g = treecorr.Catalog(g1=gal_g1,   g2=gal_g2,   ra=gal_ra, dec=gal_dec, w = gal_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
