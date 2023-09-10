@@ -1,0 +1,5 @@
+ I've uploaded all the notebooks/scripts for the tests into shear_tests folder, and I also uploaded plotting notebooks into the paper_plots folder. For each of the notebooks/scripts, I define the paths for saving and reading on top; you can change this if you wish to rerun them. So here are some documentations on which notebooks to run for each test:
+ brighter fatter: shear_tests/brighter_fatter_v2.ipynb for running the test, and paper_plots/plot_brighter_fatter.ipynb for plotting.
+ shear vs X: shear_tests/shear_vs_X_v2.ipynb for running the test, and paper_plots/plot_shear_vs_X.ipynb for plotting.
+ shear around field centers: submit a job on midway to run shear_tests/shear_field_center.py (I also put a sh file in the same folder. The script takes in an argument for NSIDE to make the mask.) Then run paper_plots/shear_around_field_center.ipynb to plot.
+ B modes: since Dhayaa also has codes for this, I only put my version in shear_tests/B-mode_v2.ipynb
