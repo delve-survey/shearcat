@@ -71,15 +71,14 @@ if __name__ == "__main__":
         gal_dec = gal_dec[Mask]
         gal_w   = gal_w[Mask]
 
+        mcal_m_r, mcal_m_i, mcal_m_z = 30 - 2.5*np.log10(f['mcal_flux_noshear'][:][Mask]).T
+        
+        print("GAL r-i [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_z, [0.025, 0.5, 0.975]), 3))
+
         del mag_r, SNR, T_ratio, T, flags, foreg, stargal, SNR_Mask, Tratio_Mask, T_Mask, Flag_Mask, FG_Mask, sg_Mask, Other_Mask, Mask
-        del gal_g1, gal_g2
+        del gal_g1, gal_g2, mcal_m_r, mcal_m_i, mcal_m_z
         
-        Ngrid = 1
-        mask = (f['mcal_s2n_noshear'][::Ngrid] > 10) & (f['sg_bdf'][::Ngrid] >= 4) & (f['mcal_T_ratio_noshear'][::Ngrid] > 0.5)
-        mcal_m_r, mcal_m_i, mcal_m_z = 30 - 2.5*np.log10(f['mcal_flux_noshear'][::Ngrid][mask]).T
-        
-        print("GAL r-i [95% bounds]", np.round(np.quantile(mcal_m_r - mcal_m_z, [2.5, 97.5]), 3))
-        
+                
         
     
     #'/project/chihway/dhayaa/DECADE/star_psf_shapecatalog_20230510.hdf5'
@@ -88,7 +87,7 @@ if __name__ == "__main__":
         print(list(f.keys()))
 
         Ngrid = 1
-        ra, dec = f['ra'][::Ngrid], fa['dec'][::Ngrid]
+        psf_ra, psf_dec = f['ra'][::Ngrid], f['dec'][::Ngrid]
         ZE1 = f['g1_model_hsm'][::Ngrid]
         ZE2 = f['g2_model_hsm'][::Ngrid]
         ONE = f['T_star_hsm'][::Ngrid]
@@ -131,7 +130,7 @@ if __name__ == "__main__":
         
         Mask = (psf_w > 0) & (SNR > args['SNRCut'])
         
-        del ra, dec, SNR, weight_map, gal_ra, gal_dec
+        del psf_ra, psf_dec, SNR, weight_map, gal_ra, gal_dec
         
         ZE1 = ZE1[Mask]
         ZE2 = ZE2[Mask]
@@ -143,6 +142,21 @@ if __name__ == "__main__":
         color = color[Mask]
         psf_w = psf_w[Mask] 
         
+        
+        ########################################################################################################################
+        #NOW AVERAGE ACROSS FOOTPRINTS
+        ########################################################################################################################
+        
+        print("<p> e1_psf:", np.average(ZE1, weights = psf_w))
+        print("<p> e2_psf:", np.average(ZE2, weights = psf_w))
+        
+        
+        print("<q> e1_err:", np.average(TH1, weights = psf_w))
+        print("<q> e2_err:", np.average(TH2, weights = psf_w))
+        
+        
+        print("<T> T_err:", np.average(TWO, weights = psf_w))
+        print("sig(T) T_err:", np.sqrt(np.average(TWO**2, weights = psf_w) - np.average(TWO, weights = psf_w)**2))
         
         ########################################################################################################################
         #NOW COMPUTE COLOR DEPENDENT QUANTITIES
@@ -166,23 +180,10 @@ if __name__ == "__main__":
         avg4 = np.histogram(color, bins = bins, weights = TH2 * 1e3)[0]/counts
 
         
-        avg = np.concatenate([avg1, avg2, avg3, avg4], axis = 1)
+        avg = np.concatenate([avg1, avg2, avg3, avg4], axis = 0)
         
         
         Name = '' if args['Name'] == None else '_%s'%args['Name']
-        np.save(os.path.basename(args['psf_cat_path']) + '/PSFColor%s.npy'%Name, avg)
-        np.save(os.path.basename(args['psf_cat_path']) + '/PSFColorBins%s.npy'%Name, cen)
+        np.save(os.path.dirname(args['psf_cat_path']) + '/PSFColor%s.npy'%Name, avg)
+        np.save(os.path.dirname(args['psf_cat_path']) + '/PSFColorBins%s.npy'%Name, cen)
         
-        ########################################################################################################################
-        #NOW AVERAGE ACROSS FOOTPRINTS
-        ########################################################################################################################
-        
-        print("<p> e1_psf:", np.average(ZE1, weights = psf_w))
-        print("<p> e2_psf:", np.average(ZE2, weights = psf_w))
-        
-        
-        print("<q> e1_err:", np.average(TH1, weights = psf_w))
-        print("<q> e2_err:", np.average(TH2, weights = psf_w))
-        
-        
-        print("<T> T_err:", np.average(TWO, weights = psf_w))

@@ -1,7 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name StarShear
-#SBATCH --partition=caslake
-#SBATCH --account=pi-chihway
+##SBATCH --partition=caslake
+##SBATCH --account=pi-chihway
+#SBATCH --partition=kicp
+#SBATCH --account=kicp
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=48
 #SBATCH --time=30:00:00
