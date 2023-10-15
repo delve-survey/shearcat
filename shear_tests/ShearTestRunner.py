@@ -23,8 +23,8 @@ class AllTests(object):
         self.psf_cat    = psf_cat
         self.galaxy_cat = galaxy_cat
 
-        self.psf_cat_inds    = psf_cat_inds
-        self.galaxy_cat_inds = galaxy_cat_inds
+        self.psf_cat_inds = np.load(psf_cat_inds)
+        self.galaxy_cat_inds = np.load(galaxy_cat_inds)
 
         self.Npatch = 100
 
@@ -40,21 +40,19 @@ class AllTests(object):
 
         
         with h5py.File(self.psf_cat, 'r') as f:
+            RA, DEC = f['ra'][:][self.psf_cat_inds], f['dec'][:][self.psf_cat_inds]
 
-            RA, DEC = f['RA'][:][self.psf_cat_inds], f['DEC'][:][self.psf_cat_inds]
+        S = int(RA.size/5_000_000)
+        centers  = treecorr.Catalog(ra = RA[::S], dec = DEC[::S], ra_units='deg',dec_units='deg', npatch = self.Npatch)._centers
+        psf_inds = treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', patch_centers = centers)._patch
 
-        psf_inds = (treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', npatch = self.Npatch)
-                            .getNField()
-                            .run_kmeans(self.Npatch))
-
-
+        
         with h5py.File(self.galaxy_cat, 'r') as f:
+            RA, DEC = f['RA'][:][self.galaxy_cat_inds], f['DEC'][:][self.galaxy_cat_inds]
 
-            RA, DEC = f['RA'][:][self.psf_cat_inds], f['DEC'][:][self.psf_cat_inds]
-
-        gal_inds = (treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', npatch = self.Npatch)
-                            .getNField()
-                            .run_kmeans(self.Npatch))
+        S = int(RA.size/5_000_000)
+        centers  = treecorr.Catalog(ra = RA[::S], dec = DEC[::S], ra_units='deg',dec_units='deg', npatch = self.Npatch)._centers
+        gal_inds = treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', patch_centers = centers)._patch
         
 
         return psf_inds, gal_inds
@@ -88,25 +86,25 @@ class AllTests(object):
         mag     = mag_zp[mask] - 2.5*np.log10(flux[mask])
 
         
-        output  = np.zeros([5, len(self.Npatch), bins.size - 1])
+        output  = np.zeros([5, self.Npatch, bins.size - 1])
 
         #Counts for the total (all patches)
-        output[0] = np.histogram(mag, bins = bins, weights = dT)
-        output[1] = np.histogram(mag, bins = bins, weights = dT_frac)
-        output[2] = np.histogram(mag, bins = bins, weights = de1)
-        output[3] = np.histogram(mag, bins = bins, weights = de2)
-        output[4] = np.histogram(mag, bins = bins)
+        output[0] = np.histogram(mag, bins = bins, weights = dT)[0]
+        output[1] = np.histogram(mag, bins = bins, weights = dT_frac)[0]
+        output[2] = np.histogram(mag, bins = bins, weights = de1)[0]
+        output[3] = np.histogram(mag, bins = bins, weights = de2)[0]
+        output[4] = np.histogram(mag, bins = bins)[0]
 
         #Remove individual patches now
-        for j in range(self.Npatch):
+        for j in tqdm(range(self.Npatch), desc = 'Brighter_Fatter_effect'):
 
-            mask = self.psf_cat_inds == j
+            patch_mask = self.psf_inds[mask] == j
 
-            output[0, j] -= np.histogram(mag[mask], bins = bins, weights = dT[mask])
-            output[1, j] -= np.histogram(mag[mask], bins = bins, weights = dT_frac[mask])
-            output[2, j] -= np.histogram(mag[mask], bins = bins, weights = de1[mask])
-            output[3, j] -= np.histogram(mag[mask], bins = bins, weights = de2[mask])
-            output[4, j] -= np.histogram(mag[mask], bins = bins)
+            output[0, j] -= np.histogram(mag[patch_mask], bins = bins, weights = dT[patch_mask])[0]
+            output[1, j] -= np.histogram(mag[patch_mask], bins = bins, weights = dT_frac[patch_mask])[0]
+            output[2, j] -= np.histogram(mag[patch_mask], bins = bins, weights = de1[patch_mask])[0]
+            output[3, j] -= np.histogram(mag[patch_mask], bins = bins, weights = de2[patch_mask])[0]
+            output[4, j] -= np.histogram(mag[patch_mask], bins = bins)[0]
 
 
         #Normalize by the counts per patch version
@@ -114,8 +112,8 @@ class AllTests(object):
             output[i] /= output[4]
 
 
-        savepath = self.output_path + '/BrighterFatter.npy'
-        np.save(savepath, output)
+        np.save(self.output_path + '/BrighterFatter.npy', output)
+        np.save(self.output_path + '/BrighterFatter_bins.npy', bincenter)
 
 
     def get_mcal_Mask(self, label):
@@ -300,7 +298,7 @@ class AllTests(object):
                 output  = np.zeros([3, len(self.Npatch), bin_edge.size - 1])
 
                 #Remove individual patches now
-                for j in range(self.Npatch):
+                for j in tqdm(range(self.Npatch), desc = 'shear vs %s' % q):
 
                     mask = self.galaxy_cat_inds != j
 
@@ -1155,4 +1153,24 @@ class AllTests(object):
 
 if __name__ == '__main__':
 
-    pass
+    
+    import argparse
+
+    my_parser = argparse.ArgumentParser()
+
+    #Metaparams
+    my_parser.add_argument('--psf_cat',     action='store', type = str, required = True)
+    my_parser.add_argument('--galaxy_cat',  action='store', type = str, required = True)
+    my_parser.add_argument('--psf_cat_inds',    action='store', type = str, required = True)
+    my_parser.add_argument('--galaxy_cat_inds', action='store', type = str, required = True)
+    my_parser.add_argument('--output_path',     action='store', type = str, required = True)
+    my_parser.add_argument('--sim_Cls_path',    action='store', type = str, required = True)
+
+    args  = vars(my_parser.parse_args())
+    
+    
+    RUNNER = AllTests(**args)
+    
+    
+#     RUNNER.brighter_fatter_effect()
+    RUNNER.shear_vs_X()
