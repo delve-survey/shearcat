@@ -6,6 +6,6 @@
 #SBATCH --exclusive
 #SBATCH --nodes=1
 
-python CombineGoldMetacal_v5.py
+python CombineGoldMetacal_mask.py
 
 
