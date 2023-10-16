@@ -1,14 +1,25 @@
 import numpy as np
 import os
 import subprocess as sp
+import sys
 
 bpz_run = '/project/chihway/chihway/DESC_BPZ/scripts/bpz.py'
-
-metadata = np.genfromtxt('/project/chihway/chihway/shearcat/Tilelist/11072023/new_final_list_DR3_1_1.txt', dtype='str', delimiter=",")[1:]
-
 prior = 'sva1_weights'
 
-for i in range(10): #len(metadata)): #change here to make short run if you wish  
+batch_id = int(sys.argv[1])
+meta_file = sys.argv[2]
+last_id = int(sys.argv[3])
+
+if last_id==6684:
+    print("last batch")
+else: 
+    last_id = (batch_id+1)*100)
+
+# metadata = np.genfromtxt('/project/chihway/chihway/shearcat/Tilelist/11072023/new_final_list_DR3_1_1.txt', dtype='str', delimiter=",")[1:]
+metadata = np.genfromtxt(meta_file, dtype='str', delimiter=",")[1:]
+
+
+for i in range(batch_id*100,last_id): #len(metadata)): #change here to make short run if you wish  
     tile = metadata[i][0]
     print(i, tile)
 
