@@ -118,49 +118,58 @@ class AllTests(object):
 
     def get_mcal_Mask(self, label):
     
-        with h5py.File(self.galaxy_cat, 'r') as f:
+        if os.path.isfile(os.environ['TMPDIR'] + '/MASK_%s.npy' % label):
+            Mask = np.load(os.environ['TMPDIR'] + '/MASK_%s.npy' % label)
+            
+        else:
+            with h5py.File(self.galaxy_cat, 'r') as f:
 
             
-            #Normally needed for GOLD foreground cut but
-            #we don't do that here, so it's fine.
-            # ra      = f['RA'][:][self.galaxy_cat_inds]
-            # dec     = f['DEC'][:][self.galaxy_cat_inds]
+                #Normally needed for GOLD foreground cut but
+                #we don't do that here, so it's fine.
+                # ra      = f['RA'][:][self.galaxy_cat_inds]
+                # dec     = f['DEC'][:][self.galaxy_cat_inds]
 
-            e1, e2  = f[f'mcal_g_{label}'][:][self.galaxy_cat_inds].T
+                e1, e2  = f[f'mcal_g_{label}'][:][self.galaxy_cat_inds].T
 
-            mag_r   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 0][self.galaxy_cat_inds])
-            mag_i   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 1][self.galaxy_cat_inds])
-            mag_z   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 2][self.galaxy_cat_inds])
+                with np.errstate(invalid = 'ignore', divide = 'ignore'):
+                    mag_r   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 0][self.galaxy_cat_inds])
+                    mag_i   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 1][self.galaxy_cat_inds])
+                    mag_z   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 2][self.galaxy_cat_inds])
 
-            SNR     = f[f'mcal_s2n_{label}'][:][self.galaxy_cat_inds]
-            T_ratio = f[f'mcal_T_ratio_{label}'][:][self.galaxy_cat_inds]
-            T       = f[f'mcal_T_{label}'][:][self.galaxy_cat_inds]
-            flags   = f['mcal_flags'][:][self.galaxy_cat_inds]
-            sg_bdf  = f['sg_bdf'][:][self.galaxy_cat_inds]
+                SNR     = f[f'mcal_s2n_{label}'][:][self.galaxy_cat_inds]
+                T_ratio = f[f'mcal_T_ratio_{label}'][:][self.galaxy_cat_inds]
+                T       = f[f'mcal_T_{label}'][:][self.galaxy_cat_inds]
+                flags   = f['mcal_flags'][:][self.galaxy_cat_inds]
+                sg_bdf  = f['sg_bdf'][:][self.galaxy_cat_inds]
 
-        # We don't use the gold cuts, as the expectations is to include them
-        # in the indices that are passed in.
+            # We don't use the gold cuts, as the expectations is to include them
+            # in the indices that are passed in.
+
+            #GOLD_Foreground  = hp.read_map(fgpath, dtype = int)
+            #FLAGS_Foreground = GOLD_Foreground[hp.ang2pix(hp.npix2nside(GOLD_Foreground.size), ra, dec, lonlat = True)]
+
+            #Metacal cuts based on DES Y3 ones (from here: https://des.ncsa.illinois.edu/releases/y3a2/Y3key-catalogs)
+            with np.errstate(invalid = 'ignore', divide = 'ignore'):
+                SNR_Mask   = (SNR > 10) & (SNR < 1000)
+                Tratio_Mask= T_ratio > 0.5
+                T_Mask     = T < 10
+                Flag_Mask  = flags == 0
+                Other_Mask = np.invert((T > 2) & (SNR < 30)) & np.invert((np.log10(T) < (22.25 - mag_r)/3.5) & (e1**2 + e2**2 > 0.8**2))
+                SG_Mask    = sg_bdf >= 4 #Star-galaxy separator
+                Color_Mask = ((18 < mag_i) & (mag_i < 23.5) & 
+                              (15 < mag_r) & (mag_r < 26) & 
+                              (15 < mag_z) & (mag_z < 26) & 
+                              (-1.5 < mag_r - mag_i) & (mag_r - mag_i < 4) & 
+                              (-1.5 < mag_i - mag_z) & (mag_i - mag_z < 4)
+                             )
+
+            Mask = SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Color_Mask & Other_Mask & SG_Mask
+            
+            np.save(os.environ['TMPDIR'] + '/MASK_%s.npy' % label, Mask)
+
+            print("Loaded Mask")
         
-        #GOLD_Foreground  = hp.read_map(fgpath, dtype = int)
-        #FLAGS_Foreground = GOLD_Foreground[hp.ang2pix(hp.npix2nside(GOLD_Foreground.size), ra, dec, lonlat = True)]
-
-        #Metacal cuts based on DES Y3 ones (from here: https://des.ncsa.illinois.edu/releases/y3a2/Y3key-catalogs)
-
-        SNR_Mask   = (SNR > 10) & (SNR < 1000)
-        Tratio_Mask= T_ratio > 0.5
-        T_Mask     = T < 10
-        Flag_Mask  = flags == 0
-        Other_Mask = np.invert((T > 2) & (SNR < 30)) & np.invert((np.log10(T) < (22.25 - mag_r)/3.5) & (e1**2 + e2**2 > 0.8**2))
-        SG_Mask    = sg_bdf >= 4 #Star-galaxy separator
-        Color_Mask = ((18 < mag_i) & (mag_i < 23.5) & 
-                      (15 < mag_r) & (mag_r < 26) & 
-                      (15 < mag_z) & (mag_z < 26) & 
-                      (-1.5 < mag_r - mag_i) & (mag_r - mag_i < 4) & 
-                      (-1.5 < mag_i - mag_z) & (mag_i - mag_z < 4)
-                     )
-
-        Mask = SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Color_Mask & Other_Mask & SG_Mask
-
         return Mask
     
 
@@ -175,16 +184,16 @@ class AllTests(object):
         dgamma = 0.01*2
 
         with h5py.File(self.galaxy_cat, 'r') as f:
-            R11    = (np.average(f['mcal_g_1p'][self.galaxy_cat_inds, 0][Mask0 & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])
-                    - np.average(f['mcal_g_1p'][self.galaxy_cat_inds, 0][Mask0 & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
-            R11s   = (np.average(f['mcal_g_noshear'][self.galaxy_cat_inds, 0][Mask1p & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds][Mask1p & mask])
-                    - np.average(f['mcal_g_noshear'][self.galaxy_cat_inds, 0][Mask1m & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds][Mask1m & mask]))/dgamma
+            R11    = (np.average(f['mcal_g_1p'][:][self.galaxy_cat_inds, 0][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask])
+                    - np.average(f['mcal_g_1p'][:][self.galaxy_cat_inds, 0][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
+            R11s   = (np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 0][Mask1p & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask1p & mask])
+                    - np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 0][Mask1m & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask1m & mask]))/dgamma
             R11tot = R11 + R11s
             
-            R22    = (np.average(f['mcal_g_2p'][self.galaxy_cat_inds, 1][Mask0 & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds, 1][Mask0 & mask])
-                    - np.average(f['mcal_g_2p'][self.galaxy_cat_inds, 1][Mask0 & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds, 1][Mask0 & mask]))/dgamma
-            R22s   = (np.average(f['mcal_g_noshear'][self.galaxy_cat_inds, 1][Mask2p & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds, 1][Mask2p & mask])
-                    - np.average(f['mcal_g_noshear'][self.galaxy_cat_inds, 1][Mask2m & mask], weights = f['mcal_g_w'][self.galaxy_cat_inds, 1][Mask2m & mask]))/dgamma
+            R22    = (np.average(f['mcal_g_2p'][:][self.galaxy_cat_inds, 1][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask])
+                    - np.average(f['mcal_g_2p'][:][self.galaxy_cat_inds, 1][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
+            R22s   = (np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 1][Mask2p & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask2p & mask])
+                    - np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 1][Mask2m & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask2m & mask]))/dgamma
             R22tot = R22 + R22s
 
         return R11tot, R22tot
@@ -193,14 +202,7 @@ class AllTests(object):
     def shear_vs_X(self):
 
 
-        def mean(x, inds, w=None): 
-            if w is None: 
-                w = np.ones_like(x)
-            return np.bincount(inds,weights=x*w)/np.bincount(inds,weights=w)
-
-
         Quantities = ['SNR', 'Tratio', 'Tpsf', 'e1psf', 'e2psf', 'r_minus_i', 'r_minus_z', 'i_minus_z']
-
 
         Mask0  = self.get_mcal_Mask('noshear')
         Mask1p = self.get_mcal_Mask('1p')
@@ -208,65 +210,81 @@ class AllTests(object):
         Mask1m = self.get_mcal_Mask('1m')
         Mask2m = self.get_mcal_Mask('2m')
 
+        with h5py.File(self.galaxy_cat, 'r') as f:
+
+            mcal_g_w = f['mcal_g_w'][:][self.galaxy_cat_inds]
+            no_wgts  = np.ones_like(mcal_g_w)
+            mcal_g_noshear = f['mcal_g_noshear'][:][self.galaxy_cat_inds]
+            mcal_g_1p = f['mcal_g_1p'][:][self.galaxy_cat_inds]
+            mcal_g_2p = f['mcal_g_2p'][:][self.galaxy_cat_inds]
+            mcal_g_1m = f['mcal_g_1m'][:][self.galaxy_cat_inds]
+            mcal_g_2m = f['mcal_g_2m'][:][self.galaxy_cat_inds]
+
         for q in Quantities:
 
 
-            N_bins = 21
+            N_bins = 20 + 1
             with h5py.File(self.galaxy_cat, 'r') as f:
 
                 if q  == 'SNR':
-                    bin_edge = np.percentile(f['mcal_s2n_noshear'][self.galaxy_cat_inds][Mask0], np.linspace(0, 100, N_bins))
+                    
+                    mcal_s2n_noshear = f['mcal_s2n_noshear'][:][self.galaxy_cat_inds]
+                    mcal_s2n_1p = f['mcal_s2n_1p'][:][self.galaxy_cat_inds]
+                    mcal_s2n_2p = f['mcal_s2n_2p'][:][self.galaxy_cat_inds]
+                    mcal_s2n_1m = f['mcal_s2n_1m'][:][self.galaxy_cat_inds]
+                    mcal_s2n_2m = f['mcal_s2n_2m'][:][self.galaxy_cat_inds]
+                    
+                    bin_edge = np.nanpercentile(mcal_s2n_noshear[Mask0], np.linspace(0, 100, N_bins))
                     bin_edge[0], bin_edge[-1] = -99999, 99999
-
-                    inds0  = np.digitize(f['mcal_s2n_noshear'][self.galaxy_cat_inds][Mask0], bin_edge) - 1
-                    inds1p = np.digitize(f['mcal_s2n_1p'][self.galaxy_cat_inds][Mask1p], bin_edge) - 1
-                    inds1m = np.digitize(f['mcal_s2n_1m'][self.galaxy_cat_inds][Mask1m], bin_edge) - 1
-                    inds2p = np.digitize(f['mcal_s2n_2p'][self.galaxy_cat_inds][Mask2p], bin_edge) - 1
-                    inds2m = np.digitize(f['mcal_s2n_2m'][self.galaxy_cat_inds][Mask2m], bin_edge) - 1
+                    
+                    A = mcal_s2n_noshear
+                    B, C = mcal_s2n_1p, mcal_s2n_1m
+                    D, E = mcal_s2n_2p, mcal_s2n_2m
+                                        
 
                 elif q == 'Tratio':
 
-                    bin_edge = np.percentile(f['mcal_T_ratio_noshear'][self.galaxy_cat_inds][Mask0], np.linspace(0, 100, N_bins))
+                    mcal_T_ratio_noshear = f['mcal_T_ratio_noshear'][:][self.galaxy_cat_inds]
+                    mcal_T_ratio_1p = f['mcal_T_ratio_1p'][:][self.galaxy_cat_inds]
+                    mcal_T_ratio_2p = f['mcal_T_ratio_2p'][:][self.galaxy_cat_inds]
+                    mcal_T_ratio_1m = f['mcal_T_ratio_1m'][:][self.galaxy_cat_inds]
+                    mcal_T_ratio_2m = f['mcal_T_ratio_2m'][:][self.galaxy_cat_inds]
+                    
+                    bin_edge = np.nanpercentile(mcal_T_ratio_noshear[Mask0], np.linspace(0, 100, N_bins))
                     bin_edge[0], bin_edge[-1] = -99999, 99999
+                    
+                    A = mcal_T_ratio_noshear
+                    B, C = mcal_T_ratio_1p, mcal_T_ratio_1m
+                    D, E = mcal_T_ratio_2p, mcal_T_ratio_2m
 
-                    inds0  = np.digitize(f['mcal_T_ratio_noshear'][self.galaxy_cat_inds][Mask0], bin_edge) - 1
-                    inds1p = np.digitize(f['mcal_T_ratio_1p'][self.galaxy_cat_inds][Mask1p], bin_edge) - 1
-                    inds1m = np.digitize(f['mcal_T_ratio_1m'][self.galaxy_cat_inds][Mask1m], bin_edge) - 1
-                    inds2p = np.digitize(f['mcal_T_ratio_2p'][self.galaxy_cat_inds][Mask2p], bin_edge) - 1
-                    inds2m = np.digitize(f['mcal_T_ratio_2m'][self.galaxy_cat_inds][Mask2m], bin_edge) - 1
-                
+
                 elif q == 'Tpsf':
 
-                    bin_edge = np.percentile(f['mcal_psf_T_noshear'][Mask0], np.linspace(0, 100, N_bins))
+                    mcal_psf_T_noshear = f['mcal_psf_T_noshear'][:][self.galaxy_cat_inds]
+                    
+                    bin_edge = np.nanpercentile(mcal_psf_T_noshear[Mask0], np.linspace(0, 100, N_bins))
                     bin_edge[0], bin_edge[-1] = -99999, 99999
+                    
+                    A = B = C = D = E = mcal_psf_T_noshear
 
-                    inds0  = np.digitize(f['mcal_psf_T_noshear'][self.galaxy_cat_inds][Mask0], bin_edge) - 1
-                    inds1p = np.digitize(f['mcal_psf_T_noshear'][self.galaxy_cat_inds][Mask1p], bin_edge) - 1
-                    inds1m = np.digitize(f['mcal_psf_T_noshear'][self.galaxy_cat_inds][Mask1m], bin_edge) - 1
-                    inds2p = np.digitize(f['mcal_psf_T_noshear'][self.galaxy_cat_inds][Mask2p], bin_edge) - 1
-                    inds2m = np.digitize(f['mcal_psf_T_noshear'][self.galaxy_cat_inds][Mask2m], bin_edge) - 1
 
                 elif q == 'e1psf':
 
-                    bin_edge = np.percentile(f['mcal_psf_g_noshear'][Mask0, 0], np.linspace(0, 100, N_bins))
+                    mcal_psf_g_noshear = f['mcal_psf_g_noshear'][:, 0][self.galaxy_cat_inds]
+                    
+                    bin_edge = np.nanpercentile(mcal_psf_g_noshear[Mask0], np.linspace(0, 100, N_bins))
                     bin_edge[0], bin_edge[-1] = -99999, 99999
-
-                    inds0  = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask0, 0], bin_edge) - 1
-                    inds1p = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask1p, 0], bin_edge) - 1
-                    inds1m = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask1m, 0], bin_edge) - 1
-                    inds2p = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask2p, 0], bin_edge) - 1
-                    inds2m = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask2m, 0], bin_edge) - 1
+                    
+                    A = B = C = D = E = mcal_psf_g_noshear
 
                 elif q == 'e2psf':
 
-                    bin_edge = np.percentile(f['mcal_psf_g_noshear'][Mask0, 1], np.linspace(0, 100, N_bins))
+                    mcal_psf_g_noshear = f['mcal_psf_g_noshear'][:, 1][self.galaxy_cat_inds]
+                    
+                    bin_edge = np.nanpercentile(mcal_psf_g_noshear[Mask0], np.linspace(0, 100, N_bins))
                     bin_edge[0], bin_edge[-1] = -99999, 99999
-
-                    inds0  = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask0, 1], bin_edge) - 1
-                    inds1p = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask1p, 1], bin_edge) - 1
-                    inds1m = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask1m, 1], bin_edge) - 1
-                    inds2p = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask2p, 1], bin_edge) - 1
-                    inds2m = np.digitize(f['mcal_psf_g_noshear'][self.galaxy_cat_inds][Mask2m, 1], bin_edge) - 1
+                    
+                    A = B = C = D = E = mcal_psf_g_noshear
 
                 
                 elif q in ['r_minus_i', 'r_minus_z', 'i_minus_z']:
@@ -277,69 +295,148 @@ class AllTests(object):
                     f_2 = keymatch[q.split('_')[2]]
 
                     def get_color(label):
-                        c1 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][self.galaxy_cat_inds, f_1])
-                        c2 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][self.galaxy_cat_inds, f_2])
+                        c1 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:][self.galaxy_cat_inds, f_1])
+                        c2 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:][self.galaxy_cat_inds, f_2])
 
                         return c1 - c2
 
-                    color = get_color('noshear')
-                    bin_edge = np.nanpercentile(get_color('noshear')[Mask0], np.linspace(0, 100, N_bins))
+                    color_noshear = get_color('noshear')
+                    color_1p, color_1m = get_color('1p'), get_color('1m')
+                    color_2p, color_2m = get_color('2p'), get_color('2m')
+                    
+                    bin_edge = np.nanpercentile(color_noshear[Mask0], np.linspace(0, 100, N_bins))
                     bin_edge[0], bin_edge[-1] = -99999, 99999
-
-                    inds0  = np.digitize(get_color('noshear')[Mask0], bin_edge) - 1
-                    inds1p = np.digitize(get_color('1p')[Mask1p], bin_edge) - 1
-                    inds1m = np.digitize(get_color('1m')[Mask1m], bin_edge) - 1
-                    inds2p = np.digitize(get_color('2p')[Mask2p], bin_edge) - 1
-                    inds2m = np.digitize(get_color('2m')[Mask2m], bin_edge) - 1
+                    
+                    
+                    A = color_noshear
+                    B, C = color_1p, color_1m
+                    D, E = color_2p, color_2m
 
 
                 dgamma = 2*0.01                
 
-                output  = np.zeros([3, len(self.Npatch), bin_edge.size - 1])
+                output  = np.zeros([3, self.Npatch, bin_edge.size - 1])
+                
+                
+                def hist(x, y, bin_edges, w, masks):
+            
+                    x = x[masks]
+                    y = y[masks]
+                    w = w[masks]
+
+                    return np.histogram(x, bin_edges, weights=y*w)[0]
+
+                mean_noshear = np.average(mcal_g_noshear[Mask0], weights = mcal_g_w[Mask0], axis = 0)
+                    
+                R11_p  = hist(A, mcal_g_1p[:, 0], bin_edge, mcal_g_w, Mask0)
+                R11_m  = hist(A, mcal_g_1m[:, 0], bin_edge, mcal_g_w, Mask0)
+                R11s_p = hist(B, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1p)
+                R11s_m = hist(C, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1m)
+                
+                
+                R22_p  = hist(A, mcal_g_2p[:, 1], bin_edge, mcal_g_w, Mask0)
+                R22_m  = hist(A, mcal_g_2m[:, 1], bin_edge, mcal_g_w, Mask0)
+                R22s_p = hist(D, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2p)
+                R22s_m = hist(E, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2m)
+                
+                
+                R_counts = hist(A, no_wgts, bin_edge, mcal_g_w, Mask0)
+                Rs_1p_counts = hist(B, no_wgts, bin_edge, mcal_g_w, Mask1p)
+                Rs_1m_counts = hist(C, no_wgts, bin_edge, mcal_g_w, Mask1m)
+                Rs_2p_counts = hist(D, no_wgts, bin_edge, mcal_g_w, Mask2p)
+                Rs_2m_counts = hist(E, no_wgts, bin_edge, mcal_g_w, Mask2m)
+                
+                e1 = hist(A, mcal_g_noshear[:, 0] - mean_noshear[0], bin_edge, mcal_g_w, Mask0)
+                e2 = hist(A, mcal_g_noshear[:, 1] - mean_noshear[1], bin_edge, mcal_g_w, Mask0)
+                X  = hist(A, A, bin_edge, mcal_g_w, Mask0)
+                
+                
+#                 R11 = (mean(A, mcal_g_1p[:, 0], bin_edge, mcal_g_w, Mask0 & mask)
+#                      - mean(A, mcal_g_1m[:, 0], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
+
+#                 R11s = (mean(B, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1p & mask)
+#                      -  mean(C, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1m & mask))/dgamma
+
+#                 R11tot = R11 + R11s
+
+#                 R22 = (mean(A, mcal_g_2p[:, 1], bin_edge, mcal_g_w, Mask0 & mask)
+#                      - mean(A, mcal_g_2m[:, 1], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
+
+#                 R22s = (mean(D, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2p & mask)
+#                      -  mean(E, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2m & mask))/dgamma
+
+#                 R22tot = R22 + R22s
+
+#                 e1 = mean(A, mcal_g_noshear[:, 0] - mean_noshear[0], bin_edge, mcal_g_w, Mask0 & mask)/R11tot
+#                 e2 = mean(A, mcal_g_noshear[:, 1] - mean_noshear[1], bin_edge, mcal_g_w, Mask0 & mask)/R22tot
+#                 X  = mean(A, A, bin_edge, mcal_g_w, Mask0 & mask)
 
                 #Remove individual patches now
                 for j in tqdm(range(self.Npatch), desc = 'shear vs %s' % q):
 
-                    mask = self.galaxy_cat_inds != j
+                    mask = self.gal_inds == j
+                
+                
+                    R11_p_here  = R11_p - hist(A, mcal_g_1p[:, 0], bin_edge, mcal_g_w, Mask0 & mask)
+                    R11_m_here  = R11_m - hist(A, mcal_g_1m[:, 0], bin_edge, mcal_g_w, Mask0 & mask)
+                    R11s_p_here = R11s_p - hist(B, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1p & mask)
+                    R11s_m_here = R11s_m - hist(C, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1m & mask)
 
-                    R11    = (mean(f['mcal_g_1p'][self.galaxy_cat_inds, 0][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask]) 
-                            - mean(f['mcal_g_1m'][self.galaxy_cat_inds, 0][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
-                    R11s   = (mean(f['mcal_g_noshear'][self.galaxy_cat_inds, 0][Mask1p & mask], inds1p, f['mcal_g_w'][self.galaxy_cat_inds][Mask1p & mask]) 
-                            - mean(f['mcal_g_noshear'][self.galaxy_cat_inds, 0][Mask1m & mask], inds1m, f['mcal_g_w'][self.galaxy_cat_inds][Mask1m & mask]))/dgamma
-                    R11tot = R11 + R11s
+
+                    R22_p_here  = R22_p - hist(A, mcal_g_2p[:, 1], bin_edge, mcal_g_w, Mask0 & mask)
+                    R22_m_here  = R22_m - hist(A, mcal_g_2m[:, 1], bin_edge, mcal_g_w, Mask0 & mask)
+                    R22s_p_here = R22s_p - hist(D, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2p & mask)
+                    R22s_m_here = R22s_m - hist(E, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2m & mask)
+
+
+                    R_counts_here = R_counts - hist(A, no_wgts, bin_edge, mcal_g_w, Mask0 & mask)
+                    Rs_1p_counts_here = Rs_1p_counts - hist(B, no_wgts, bin_edge, mcal_g_w, Mask1p & mask)
+                    Rs_1m_counts_here = Rs_1m_counts - hist(C, no_wgts, bin_edge, mcal_g_w, Mask1m & mask)
+                    Rs_2p_counts_here = Rs_2p_counts - hist(D, no_wgts, bin_edge, mcal_g_w, Mask2p & mask)
+                    Rs_2m_counts_here = Rs_2m_counts - hist(E, no_wgts, bin_edge, mcal_g_w, Mask2m & mask)
+
+                    e1_here = e1 - hist(A, mcal_g_noshear[:, 0] - mean_noshear[0], bin_edge, mcal_g_w, Mask0 & mask)
+                    e2_here = e2 - hist(A, mcal_g_noshear[:, 1] - mean_noshear[1], bin_edge, mcal_g_w, Mask0 & mask)
+                    X_here  = X  - hist(A, A, bin_edge, mcal_g_w, Mask0 & mask)
                     
-                    R22    = (mean(f['mcal_g_2p'][self.galaxy_cat_inds, 1][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])        
-                            - mean(f['mcal_g_2m'][self.galaxy_cat_inds, 1][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
-                    R22s   = (mean(f['mcal_g_noshear'][self.galaxy_cat_inds, 1][Mask2p & mask], inds2p, f['mcal_g_w'][self.galaxy_cat_inds][Mask1p & mask]) 
-                            - mean(f['mcal_g_noshear'][self.galaxy_cat_inds, 1][Mask2m & mask], inds2m, f['mcal_g_w'][self.galaxy_cat_inds][Mask1m & mask]))/dgamma
-                    R22tot = R22 + R22s
                     
-                    e1  = mean(f['mcal_g_noshear'][self.galaxy_cat_inds, 0][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])/R11tot
-                    e2  = mean(f['mcal_g_noshear'][self.galaxy_cat_inds, 1][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])/R22tot
-
-
-                    if q  == 'SNR':
-                        X = mean(f['mcal_s2n_noshear'][self.galaxy_cat_inds][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])
-
-                    elif q == 'Tratio':
-                        X = mean(f['mcal_T_ratio_noshear'][self.galaxy_cat_inds][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])
+                    R11  = (R11_p_here/R_counts_here - R11_m_here/R_counts_here)/dgamma
+                    R11s = (R11s_p_here/Rs_1p_counts_here - R11s_m_here/Rs_1m_counts_here)/dgamma
+                    R11_tot = R11 + R11s
                     
-                    elif q == 'Tpsf':
-                        X = mean(f['mcal_psf_T_noshear'][self.galaxy_cat_inds][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])
+                    R22  = (R22_p_here/R_counts_here - R22_m_here/R_counts_here)/dgamma
+                    R22s = (R22s_p_here/Rs_2p_counts_here - R22s_m_here/Rs_2m_counts_here)/dgamma
+                    R22_tot = R22 + R22s
+                    
+                    output[0, j] = X_here/R_counts_here
+                    output[1, j] = e1_here/R_counts_here / R11_tot
+                    output[2, j] = e2_here/R_counts_here / R22_tot
+                    
+#                     mean_noshear = np.average(mcal_g_noshear[Mask0 & mask], weights = mcal_g_w[Mask0 & mask], axis = 0)
+                    
+#                     R11 = (mean(A, mcal_g_1p[:, 0], bin_edge, mcal_g_w, Mask0 & mask)
+#                          - mean(A, mcal_g_1m[:, 0], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
 
-                    elif q == 'e1psf':
-                        X = mean(f['mcal_psf_g_noshear'][self.galaxy_cat_inds, 0][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])
+#                     R11s = (mean(B, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1p & mask)
+#                          -  mean(C, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1m & mask))/dgamma
 
-                    elif q == 'e2psf':
-                        X = mean(f['mcal_psf_g_noshear'][self.galaxy_cat_inds, 1][Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])
+#                     R11tot = R11 + R11s
+                    
+#                     R22 = (mean(A, mcal_g_2p[:, 1], bin_edge, mcal_g_w, Mask0 & mask)
+#                          - mean(A, mcal_g_2m[:, 1], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
 
-                    elif q in ['r_minus_i', 'r_minus_z', 'i_minus_z']:
-                        X = mean(color[Mask0 & mask], inds0, f['mcal_g_w'][self.galaxy_cat_inds][Mask0 & mask])
+#                     R22s = (mean(D, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2p & mask)
+#                          -  mean(E, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2m & mask))/dgamma
 
-
-                    output[0, j] = X
-                    output[1, j] = e1
-                    output[2, j] = e2
+#                     R22tot = R22 + R22s
+                    
+#                     e1 = mean(A, mcal_g_noshear[:, 0] - mean_noshear[0], bin_edge, mcal_g_w, Mask0 & mask)/R11tot
+#                     e2 = mean(A, mcal_g_noshear[:, 1] - mean_noshear[1], bin_edge, mcal_g_w, Mask0 & mask)/R22tot
+#                     X  = mean(A, A, bin_edge, mcal_g_w, Mask0 & mask)
+                    
+#                     output[0, j] = X
+#                     output[1, j] = e1
+#                     output[2, j] = e2
 
                 
             savepath = self.output_path + '/e_vs_%s.npy' % q
@@ -359,14 +456,14 @@ class AllTests(object):
         #Load the shape catalog
         with h5py.File(self.galaxy_cat, 'r') as f:
 
-            gal_ra  = f['RA'][self.galaxy_cat_inds][Mask]
-            gal_dec = f['DEC'][self.galaxy_cat_inds][Mask]
-            gal_w   = f['mcal_g_w'][self.galaxy_cat_inds][Mask]
-            gal_g1, gal_g2  = f['mcal_g_noshear'][self.galaxy_cat_inds][Mask].T
+            gal_ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            gal_dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            gal_g1, gal_g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
 
             #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [gal_g1, gal_g2]:
-                a -= np.mean(a)
+                a -= np.average(a, weights = gal_w)
 
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
@@ -446,14 +543,14 @@ class AllTests(object):
         #Load the shape catalog
         with h5py.File(self.galaxy_cat, 'r') as f:
 
-            gal_ra  = f['RA'][self.galaxy_cat_inds][Mask]
-            gal_dec = f['DEC'][self.galaxy_cat_inds][Mask]
-            gal_w   = f['mcal_g_w'][self.galaxy_cat_inds][Mask]
-            gal_g1, gal_g2  = f['mcal_g_noshear'][self.galaxy_cat_inds][Mask].T
+            gal_ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            gal_dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            gal_g1, gal_g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
 
             #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [gal_g1, gal_g2]:
-                a -= np.mean(a)
+                a -= np.average(a, weights = gal_w)
 
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
@@ -461,8 +558,8 @@ class AllTests(object):
 
         with h5py.File(self.psf_cat, 'r') as f:
         
-            psf_ra   = f['ra'][self.psf_cat_inds]
-            psf_dec  = f['dec'][self.psf_cat_inds]
+            psf_ra   = f['ra'][:][self.psf_cat_inds]
+            psf_dec  = f['dec'][:][self.psf_cat_inds]
             
             band = np.array(f['BAND']).astype('U1')[self.psf_cat_inds]
             mag  = f['MAGZP'][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
@@ -563,7 +660,7 @@ class AllTests(object):
 
              #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [g1, g2]:
-                a -= np.mean(a)
+                a -= np.average(a, weights = gal_w)
 
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
@@ -592,7 +689,7 @@ class AllTests(object):
 
             #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [gal_g1, gal_g2]:
-                a -= np.mean(a)
+                a -= np.average(a, weights = gal_w)
 
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
@@ -669,8 +766,11 @@ class AllTests(object):
         print("LOADED EVERYTHING")
 
         #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
-        for a in [gal_g1, gal_g2, g1_model, g2_model, q1, q2, w1, w2]:
-            a -= np.mean(a)
+        for a in [gal_g1, gal_g2]:
+            a -= np.average(a, weights = gal_w)
+            
+        for a in [g1_model, g2_model, q1, q2, w1, w2]:
+            a -= np.average(a, weights = psf_w)
 
 
         center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
@@ -1173,4 +1273,5 @@ if __name__ == '__main__':
     
     
 #     RUNNER.brighter_fatter_effect()
-    RUNNER.shear_vs_X()
+#     RUNNER.shear_vs_X()
+    RUNNER.tangential_shear_field_centers()
