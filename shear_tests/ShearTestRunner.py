@@ -12,6 +12,7 @@ import treecorr, pymaster as nmt
 import h5py
 from tqdm import tqdm
 import sys, os
+from datetime import datetime as dt
 
 
 class AllTests(object):
@@ -130,7 +131,7 @@ class AllTests(object):
                 # ra      = f['RA'][:][self.galaxy_cat_inds]
                 # dec     = f['DEC'][:][self.galaxy_cat_inds]
 
-                e1, e2  = f[f'mcal_g_{label}'][:][self.galaxy_cat_inds].T
+                e1, e2  = f[f'mcal_g_{label}'][:][self.galaxy_cat_inds].T 
 
                 with np.errstate(invalid = 'ignore', divide = 'ignore'):
                     mag_r   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 0][self.galaxy_cat_inds])
@@ -185,13 +186,13 @@ class AllTests(object):
 
         with h5py.File(self.galaxy_cat, 'r') as f:
             R11    = (np.average(f['mcal_g_1p'][:][self.galaxy_cat_inds, 0][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask])
-                    - np.average(f['mcal_g_1p'][:][self.galaxy_cat_inds, 0][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
+                    - np.average(f['mcal_g_1m'][:][self.galaxy_cat_inds, 0][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
             R11s   = (np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 0][Mask1p & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask1p & mask])
                     - np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 0][Mask1m & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask1m & mask]))/dgamma
             R11tot = R11 + R11s
             
             R22    = (np.average(f['mcal_g_2p'][:][self.galaxy_cat_inds, 1][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask])
-                    - np.average(f['mcal_g_2p'][:][self.galaxy_cat_inds, 1][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
+                    - np.average(f['mcal_g_2m'][:][self.galaxy_cat_inds, 1][Mask0 & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask0 & mask]))/dgamma
             R22s   = (np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 1][Mask2p & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask2p & mask])
                     - np.average(f['mcal_g_noshear'][:][self.galaxy_cat_inds, 1][Mask2m & mask], weights = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask2m & mask]))/dgamma
             R22tot = R22 + R22s
@@ -447,10 +448,10 @@ class AllTests(object):
 
 
         #First load the field centers
-        fcenters = pd.read_csv('/project/chihway/dhayaa/DECADE/FieldCenters_DR3_1_1.csv')
+        fcenters = pd.read_csv('/project/chihway/dhayaa/DECADE/FieldCenters_20231016.csv')
         fc_ra  = np.array(fcenters['RADEG'])
         fc_dec = np.array(fcenters['DECDEG'])
-
+        
         Mask = self.get_mcal_Mask('noshear')
 
         #Load the shape catalog
@@ -461,13 +462,31 @@ class AllTests(object):
             gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
             gal_g1, gal_g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
 
-            #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
-            for a in [gal_g1, gal_g2]:
-                a -= np.average(a, weights = gal_w)
+#         #####################################################
+#         #Use only DR3_1_1 region to replicate Jackie
+#         DR3_1_Mask = np.invert((fc_ra < 180) & (fc_dec > -30))
+#         fc_ra  = fc_ra[DR3_1_Mask]
+#         fc_dec = fc_dec[DR3_1_Mask]
+        
+#         DR3_1_Mask = np.invert((gal_ra < 180) & (gal_dec > -30))
+#         gal_ra  = gal_ra[DR3_1_Mask]
+#         gal_dec = gal_dec[DR3_1_Mask]
+        
+#         gal_w = gal_w[DR3_1_Mask]
+#         gal_g1 = gal_g1[DR3_1_Mask]
+#         gal_g2 = gal_g2[DR3_1_Mask]
+        
+#         print(DR3_1_Mask.size, np.average(DR3_1_Mask), "FINISHED DR3_1_1 maker")
+#         #####################################################
+        
+        #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
+        for a in [gal_g1, gal_g2]:
+            a -= np.average(a, weights = gal_w)
 
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
-            
+        
+        print(R11, R22)
 
         center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
 
@@ -475,43 +494,62 @@ class AllTests(object):
         small_cat = treecorr.Catalog(ra=gal_ra[::Nth], dec=gal_dec[::Nth], ra_units='deg',dec_units='deg', npatch = self.Npatch)
         small_cat.write_patch_centers(center_path)
         del small_cat 
-                
+        
         #NOW MAKE A RANDOMS CATALOG
-        N_randoms = 1_000_000_000 #Doing rejection sampling so start with many more points than needed
+        N_randoms = 100_000_000 #Doing rejection sampling so start with many more points than needed
         phi   = np.random.uniform(0, 2*np.pi, N_randoms)
         theta = np.arccos(1 - 2*np.random.uniform(0, 1, N_randoms))
 
-        NSIDE = 256
+        NSIDE = 1024
         # Remove points that aren't within the galaxy Mask
         hpix = hp.ang2pix(NSIDE, gal_ra, gal_dec, lonlat  = True)
-        Ngal = np.bincount(hpix, minlength = len(hpix))
+        Ngal = np.bincount(hpix, minlength = hp.nside2npix(NSIDE))
         hpix = hp.ang2pix(NSIDE, theta, phi)
         pix_mask   = Ngal[hpix] > 0
         phi, theta = phi[pix_mask], theta[pix_mask]
-
+        
+        
+        hpix = hp.ang2pix(NSIDE, fc_ra, fc_dec, lonlat  = True)
+        pix_mask   = Ngal[hpix] > 0
+        fc_ra, fc_dec = fc_ra[pix_mask], fc_dec[pix_mask]
+        
+        #Assign weights to the exps and to randoms so it is a uniform field
+        hpix = hp.ang2pix(NSIDE, fc_ra, fc_dec, lonlat  = True)
+        Ncen = np.bincount(hpix, minlength = hp.nside2npix(NSIDE))
+        
+        wmap = np.where(Ncen == 0, 0, (Ngal/Ncen)) #Make weights that make field centers roughly match the galaxy distributions.
+        hpix = hp.ang2pix(NSIDE, fc_ra, fc_dec, lonlat  = True)
+        fc_w = wmap[hpix]
+        hpix = hp.ang2pix(NSIDE, theta, phi)
+        rand_w = wmap[hpix]
+        
         #convert to RA and DEC
         rand_ra  = phi*180/np.pi
         rand_dec = 90 - theta*180/np.pi
         
         #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
         cat_g = treecorr.Catalog(g1 = gal_g1, g2 = gal_g2, ra = gal_ra, dec = gal_dec, w = gal_w, ra_units='deg', dec_units='deg', patch_centers=center_path)
-        cat_t = treecorr.Catalog(ra = fc_ra,  dec = fc_dec,  ra_units='deg',dec_units='deg', patch_centers=center_path)
-        cat_r = treecorr.Catalog(ra = rand_ra, dec = rand_dec, ra_units='deg',dec_units='deg', patch_centers=center_path)
+        cat_t = treecorr.Catalog(ra = fc_ra,   dec = fc_dec,   w = fc_w,   ra_units='deg',dec_units='deg', patch_centers=center_path)
+        cat_r = treecorr.Catalog(ra = rand_ra, dec = rand_dec, w = rand_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
         
         del gal_g1, gal_g2, gal_ra, gal_dec, gal_w
         del rand_ra, rand_dec
         
         #Compute the rowe stats
-        NG = treecorr.NGCorrelation(nbins = 25, min_sep = 0.1, max_sep = 250,
-                                    sep_units = 'arcmin',verbose = 0, bin_slop = 0.001, var_method='jackknife')
+        NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250,
+                                    sep_units = 'arcmin',verbose = 0, bin_slop = 0.0, var_method='jackknife')
         
         NG.process(cat_t, cat_g, low_mem=True)
         NG.write(os.path.join(self.output_path, 'fieldcenter_treecorr.txt'))
         cov_jk = NG.estimate_cov('jackknife')
         np.savetxt(os.path.join(self.output_path, 'fieldcenter_cov_treecorr.txt'), cov_jk)
+        
+        print("FINISHED true_shear")
 
         NG.process(cat_r, cat_g, low_mem=True)
         NG.write(os.path.join(self.output_path, 'fieldcenter_rands_treecorr.txt'))
+        
+        print("FINISHED rand_shear")
 
     
     def star_weights_map(self, gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = 256):
@@ -554,89 +592,90 @@ class AllTests(object):
 
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
-            
-
-        with h5py.File(self.psf_cat, 'r') as f:
         
-            psf_ra   = f['ra'][:][self.psf_cat_inds]
-            psf_dec  = f['dec'][:][self.psf_cat_inds]
+        print("CALIBRATED/DONE")
             
-            band = np.array(f['BAND']).astype('U1')[self.psf_cat_inds]
-            mag  = f['MAGZP'][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
-            SNR  = f['FLUX_APER_8'][self.psf_cat_inds]/f['FLUXERR_APER_8'][self.psf_cat_inds]
-            
-            
-            No_Gband  = band != 'g' #We don't use g-band in shear
-            SNR_Mask  = SNR > self.star_snr_threshold
-            Mag_Mask  = (mag > args['m_min']) & (mag < args['m_max'])
 
-            print(np.sum(Band_Mask), np.sum(No_Gband), np.sum(SNR_Mask), np.sum(Mag_Mask))
-            Mask = Band_Mask & SNR_Mask & No_Gband & Mag_Mask
-            
-            print("TOTAL NUM", np.sum(Mask))
+        for m_range, m_name in zip([[-1000, 16.5], [16.5, 10000]], ['bright', 'faint']):
+            with h5py.File(self.psf_cat, 'r') as f:
+
+                psf_ra   = f['ra'][:][self.psf_cat_inds]
+                psf_dec  = f['dec'][:][self.psf_cat_inds]
+
+                band = f['BAND'][:].astype('U1')[self.psf_cat_inds]
+                mag  = f['MAGZP'][:][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'][:])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
+                SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
+
+
+                No_Gband  = band != 'g' #We don't use g-band in shear
+                SNR_Mask  = SNR > 40
+                Mag_Mask  = (mag > m_range[0]) & (mag < m_range[1])
+
+                print(np.sum(No_Gband), np.sum(SNR_Mask), np.sum(Mag_Mask))
+                Mask = SNR_Mask & No_Gband & Mag_Mask
+
+                print("TOTAL NUM", np.sum(Mask))
+                psf_ra   = psf_ra[Mask]
+                psf_dec  = psf_dec[Mask]
+
+                del Mask, SNR_Mask, No_Gband, Mag_Mask, band, mag, SNR
+
+            print("LOADED EVERYTHING")
+
+
+            NSIDE      = 256
+            weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
+            pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
+            psf_w      = weight_map[pix] #Assign individual stars weights from the map
+
+            #Remove stars that are not in the galaxy sample's footprint
+            Mask     = psf_w > 0
             psf_ra   = psf_ra[Mask]
             psf_dec  = psf_dec[Mask]
+            psf_w    = psf_w[Mask]
+            del pix
+
+
+            #NOW MAKE A RANDOMS CATALOG
+            N_randoms = 100_000_000 #Doing rejection sampling so start with many more points than needed
+            phi   = np.random.uniform(0, 2*np.pi, N_randoms)
+            theta = np.arccos(1 - 2*np.random.uniform(0, 1, N_randoms))
+
+            # Remove points that aren't within the galaxy Mask
+            hpix = hp.ang2pix(NSIDE, theta, phi)
+            pix_mask   = weight_map[hpix] > 0
+            phi, theta = phi[pix_mask], theta[pix_mask]
+            rand_w     = weight_map[hpix][pix_mask]
+
+            #convert to RA and DEC
+            rand_ra  = phi*180/np.pi
+            rand_dec = 90 - theta*180/np.pi
+            center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
+
+            Nth    = int(len(gal_ra)/10_000_000) #Select every Nth object such that we end up using 10 million to define patches
+            small_cat = treecorr.Catalog(ra=gal_ra[::Nth], dec=gal_dec[::Nth], ra_units='deg',dec_units='deg', npatch = self.Npatch)
+            small_cat.write_patch_centers(center_path)
+            del small_cat 
+
+            #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
+            cat_g = treecorr.Catalog(g1 = gal_g1, g2 = gal_g2, ra = gal_ra, dec = gal_dec, w = gal_w, ra_units='deg', dec_units='deg', patch_centers=center_path)
+            cat_s = treecorr.Catalog(ra = psf_ra,  dec = psf_dec, w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
+            cat_r = treecorr.Catalog(ra = rand_ra, dec = rand_dec, w = rand_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
+
+            del rand_ra, rand_dec
+
+            #Compute the rowe stats
+            NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250,
+                                        sep_units = 'arcmin',verbose = 0, bin_slop = 0.001, var_method='jackknife')
+
+            NG.process(cat_s, cat_g, low_mem=True)
+            NG.write(os.path.join(self.output_path, 'starshears_%s_treecorr.txt' % m_name))
+            cov_jk = NG.estimate_cov('jackknife')
+            np.savetxt(os.path.join(self.output_path, 'starshears_%s_cov_treecorr.txt' % m_name), cov_jk)
+
+            NG.process(cat_r, cat_g, low_mem=True)
+            NG.write(os.path.join(self.output_path, 'starshears_%s_rands_treecorr.txt' % m_name))
             
-            del Mask, Band_Mask, SNR_Mask, No_Gband, Mag_Mask, band, mag, SNR
-        
-        print("LOADED EVERYTHING")
-
-        
-        NSIDE      = 256
-        weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
-        pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
-        psf_w      = weight_map[pix] #Assign individual stars weights from the map
-
-        #Remove stars that are not in the galaxy sample's footprint
-        Mask     = psf_w > 0
-        psf_ra   = psf_ra[Mask]
-        psf_dec  = psf_dec[Mask]
-        psf_w    = psf_w[Mask]
-        del pix, star, galaxy, idx_rep, idx
-        
-        
-        #NOW MAKE A RANDOMS CATALOG
-        N_randoms = 1_000_000_000 #Doing rejection sampling so start with many more points than needed
-        phi   = np.random.uniform(0, 2*np.pi, N_randoms)
-        theta = np.arccos(1 - 2*np.random.uniform(0, 1, N_randoms))
-
-        # Remove points that aren't within the galaxy Mask
-        hpix = hp.ang2pix(NSIDE, theta, phi)
-        pix_mask   = weight_map[hpix] > 0
-        phi, theta = phi[pix_mask], theta[pix_mask]
-        rand_w     = weight_map[hpix][pix_mask]
-
-        #convert to RA and DEC
-        rand_ra  = phi*180/np.pi
-        rand_dec = 90 - theta*180/np.pi
-        center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
-
-        Nth    = int(len(gal_ra)/10_000_000) #Select every Nth object such that we end up using 10 million to define patches
-        small_cat = treecorr.Catalog(ra=gal_ra[::Nth], dec=gal_dec[::Nth], ra_units='deg',dec_units='deg', npatch = self.Npatch)
-        small_cat.write_patch_centers(center_path)
-        del small_cat 
-                
-        #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
-        cat_g = treecorr.Catalog(g1 = gal_g1, g2 = gal_g2, ra = gal_ra, dec = gal_dec, w = gal_w, ra_units='deg', dec_units='deg', patch_centers=center_path)
-        cat_s = treecorr.Catalog(ra = psf_ra,  dec = psf_dec, w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
-        cat_r = treecorr.Catalog(ra = rand_ra, dec = rand_dec, w = rand_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
-        
-        del gal_g1, gal_g2, gal_ra, gal_dec, gal_w
-        del rand_ra, rand_dec
-        
-        #Compute the rowe stats
-        NG = treecorr.NGCorrelation(nbins = 25, min_sep = 0.1, max_sep = 250,
-                                    sep_units = 'arcmin',verbose = 0, bin_slop = 0.001, var_method='jackknife')
-        
-        NG.process(cat_s, cat_g, low_mem=True)
-        NG.write(os.path.join(self.output_path, 'starshears_treecorr.txt'))
-        cov_jk = NG.estimate_cov('jackknife')
-        np.savetxt(os.path.join(self.output_path, 'starshears_cov_treecorr.txt'), cov_jk)
-
-        NG.process(cat_r, cat_g, low_mem=True)
-        NG.write(os.path.join(self.output_path, 'starshears_rands_treecorr.txt'))
-
-
 
     def Bmodes(self):
 
@@ -1275,3 +1314,4 @@ if __name__ == '__main__':
 #     RUNNER.brighter_fatter_effect()
 #     RUNNER.shear_vs_X()
     RUNNER.tangential_shear_field_centers()
+    RUNNER.tangential_shear_stars()
