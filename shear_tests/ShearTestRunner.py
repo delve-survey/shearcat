@@ -13,6 +13,18 @@ import h5py
 from tqdm import tqdm
 import sys, os
 from datetime import datetime as dt
+import time
+
+#For keeping track of how long steps take
+def timeit(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        total_time = end_time - start_time
+        print(f"Function {func.__name__} took {total_time:.5} seconds to run.")
+        return result
+    return wrapper
 
 
 class AllTests(object):
@@ -36,7 +48,7 @@ class AllTests(object):
         self.sim_Cls = np.loadtxt(sim_Cls_path) #Cls to use in making Gaussian mocks for covariance 
 
 
-
+    @timeit
     def define_patches(self):
 
         
@@ -59,7 +71,7 @@ class AllTests(object):
         return psf_inds, gal_inds
 
 
-
+    @timeit
     def brighter_fatter_effect(self):
 
         N_bin = 30
@@ -116,7 +128,7 @@ class AllTests(object):
         np.save(self.output_path + '/BrighterFatter.npy', output)
         np.save(self.output_path + '/BrighterFatter_bins.npy', bincenter)
 
-
+    @timeit
     def get_mcal_Mask(self, label):
     
         if os.path.isfile(os.environ['TMPDIR'] + '/MASK_%s.npy' % label):
@@ -173,7 +185,7 @@ class AllTests(object):
         
         return Mask
     
-
+    @timeit
     def compute_response(self, mask):
 
         Mask0  = self.get_mcal_Mask('noshear')
@@ -199,7 +211,7 @@ class AllTests(object):
 
         return R11tot, R22tot
 
-
+    @timeit
     def shear_vs_X(self):
 
 
@@ -443,7 +455,7 @@ class AllTests(object):
             savepath = self.output_path + '/e_vs_%s.npy' % q
             np.save(savepath, output)
 
-    
+    @timeit
     def tangential_shear_field_centers(self):
 
 
@@ -551,7 +563,7 @@ class AllTests(object):
         
         print("FINISHED rand_shear")
 
-    
+    @timeit
     def star_weights_map(self, gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = 256):
 
         #NOW COMPUTE STAR WEIGHTS
@@ -572,7 +584,7 @@ class AllTests(object):
 
         return weight_map
     
-
+    @timeit
     def tangential_shear_stars(self):
         
 
@@ -683,7 +695,6 @@ class AllTests(object):
         nside = self.args['NSIDE']
         npix  = hp.nside2npix(nside)
 
-
         Mask = self.get_mcal_Mask('noshear')
 
         #Load the shape catalog
@@ -713,7 +724,7 @@ class AllTests(object):
         np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
         np.save(self.output_path + '/Bmode_Noise.npy', Noise)
 
-    
+    @timeit
     def rho_stats(self):
                 
         Mask = self.get_mcal_Mask('noshear')
@@ -721,10 +732,10 @@ class AllTests(object):
         #Load the shape catalog
         with h5py.File(self.galaxy_cat, 'r') as f:
 
-            gal_ra  = f['RA'][self.galaxy_cat_inds][Mask]
-            gal_dec = f['DEC'][self.galaxy_cat_inds][Mask]
-            gal_w   = f['mcal_g_w'][self.galaxy_cat_inds][Mask]
-            gal_g1, gal_g2  = f['mcal_g_noshear'][self.galaxy_cat_inds][Mask].T
+            gal_ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            gal_dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            gal_g1, gal_g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
 
             #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [gal_g1, gal_g2]:
@@ -736,38 +747,28 @@ class AllTests(object):
 
         with h5py.File(self.psf_cat, 'r') as f:
         
-            psf_ra   = f['ra'][self.psf_cat_inds]
-            psf_dec  = f['dec'][self.psf_cat_inds]
+            psf_ra   = f['ra'][:][self.psf_cat_inds]
+            psf_dec  = f['dec'][:][self.psf_cat_inds]
 
-            g1_star  = f['g1_star_hsm'][self.psf_cat_inds]
-            g2_star  = f['g2_star_hsm'][self.psf_cat_inds]
-            g1_model = f['g1_model_hsm'][self.psf_cat_inds]
-            g2_model = f['g2_model_hsm'][self.psf_cat_inds]
+            g1_star  = f['g1_star_hsm'][:][self.psf_cat_inds]
+            g2_star  = f['g2_star_hsm'][:][self.psf_cat_inds]
+            g1_model = f['g1_model_hsm'][:][self.psf_cat_inds]
+            g2_model = f['g2_model_hsm'][:][self.psf_cat_inds]
 
-            w1 = g1_star * (f['T_star_hsm'][self.psf_cat_inds] - f['T_model_hsm'][self.psf_cat_inds])/f['T_star_hsm'][self.psf_cat_inds]
-            w2 = g2_star * (f['T_star_hsm'][self.psf_cat_inds] - f['T_model_hsm'][self.psf_cat_inds])/f['T_star_hsm'][self.psf_cat_inds]
+            w1 = g1_star * (f['T_star_hsm'][:][self.psf_cat_inds] - f['T_model_hsm'][:][self.psf_cat_inds])/f['T_star_hsm'][:][self.psf_cat_inds]
+            w2 = g2_star * (f['T_star_hsm'][:][self.psf_cat_inds] - f['T_model_hsm'][:][self.psf_cat_inds])/f['T_star_hsm'][:][self.psf_cat_inds]
 
             q1 = g1_star - g1_model
             q2 = g2_star - g2_model
 
             del g1_star, g2_star
-
-            psf_ra   = psf_ra[Mask]
-            psf_dec  = psf_dec[Mask]
-            g1_model = g1_model[Mask]
-            g2_model = g2_model[Mask]
-            q1  = q1[Mask]
-            q2  = q2[Mask]
-            w1  = w1[Mask]
-            w2  = w2[Mask]
             
-            band = np.array(f['BAND']).astype('U1')[self.psf_cat_inds]
-            mag  = f['MAGZP'][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
-            SNR  = f['FLUX_APER_8'][self.psf_cat_inds]/f['FLUXERR_APER_8'][self.psf_cat_inds]
-            
+            band = np.array(f['BAND'][:]).astype('U1')[self.psf_cat_inds]
+            mag  = f['MAGZP'][:][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'][:])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
+            SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
             
             No_Gband  = band != 'g' #We don't use g-band in shear
-            SNR_Mask  = SNR > self.star_snr_threshold
+            SNR_Mask  = SNR > 40
 
             print(np.sum(No_Gband), np.sum(SNR_Mask))
             Mask = SNR_Mask & No_Gband
@@ -800,7 +801,7 @@ class AllTests(object):
         w1, w2   = w1[Mask], w2[Mask]
         g1_model = g1_model[Mask]
         g2_model = g2_model[Mask]
-        del pix, star, galaxy, idx_rep, idx
+        del pix
 
         print("LOADED EVERYTHING")
 
@@ -813,7 +814,7 @@ class AllTests(object):
 
 
         center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
-        Nth    = int(len(gal_g1)/5_000_000) #Select every Nth object such that we end up using 5million to define patches
+        Nth    = int(len(gal_g1)/20_000_000) #Select every Nth object such that we end up using 20 million to define patches
         small_cat = treecorr.Catalog(g1=gal_g1[::Nth], g2=gal_g1[::Nth], ra=gal_ra[::Nth], dec=gal_dec[::Nth], 
                                      ra_units='deg', dec_units='deg', npatch = self.Npatch)
         small_cat.write_patch_centers(center_path)
@@ -822,14 +823,9 @@ class AllTests(object):
         
         
         ########################################################################################################################
-        #NOW COMPUTE STAR WEIGHTS
+        #NOW MAKE THE CATALOGS
         ########################################################################################################################
         
-        NSIDE      = 256
-        weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
-        pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
-        psf_w      = weight_map[pix] #Assign individual stars weights from the map
-
         #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
         cat_g = treecorr.Catalog(g1=gal_g1,   g2=gal_g2,   ra=gal_ra, dec=gal_dec, w = gal_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
         cat_e = treecorr.Catalog(g1=g1_model, g2=g2_model, ra=psf_ra, dec=psf_dec, w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
@@ -843,7 +839,7 @@ class AllTests(object):
         GG = treecorr.GGCorrelation(nbins = 25, min_sep = 0.1, max_sep = 250,
                                     sep_units = 'arcmin',verbose = 0,bin_slop = 0.001, var_method='jackknife')
         GG.process(cat_g, low_mem=True)
-        GG.write(os.path.join(self.output_path, 'taustats_shear_2pt_trecorr.txt'))
+        GG.write(os.path.join(self.output_path, 'taustats_shear_2pt_treecorr.txt'))
 
 
         ########################################################################################################################
@@ -894,17 +890,18 @@ class AllTests(object):
 
         #Get the covariance matrix
         cov_jk = treecorr.estimate_multi_cov([GG, EE, QQ, EQ, WW, QW, EW, GE, GQ, GW], 'jackknife')
-        np.savetxt(os.path.join(self.output_path, 'taustats_All_cov_trecorr.txt'), cov_jk)
+        np.savetxt(os.path.join(self.output_path, 'taustats_All_cov_treecorr.txt'), cov_jk)
 
-
+    
+    @timeit
     def psf_color(self):
 
 
         #Start by building PSF color matching
         with h5py.File(self.psf_cat, 'r') as f:
 
-            ra   = f['ra'][self.psf_cat_inds]
-            dec  = f['dec'][self.psf_cat_inds]
+            ra   = f['ra'][:][self.psf_cat_inds]
+            dec  = f['dec'][:][self.psf_cat_inds]
             
             hpix = hp.ang2pix(8192 * 32, ra, dec, lonlat = True)
             unique_hpix, inds, unique_counts = np.unique(hpix, return_inverse = True, return_counts = True)
@@ -914,15 +911,15 @@ class AllTests(object):
             del hpix, unique_counts
             
             #Get selections for individual bands first
-            BAND  = f['BAND'][self.psf_cat_inds]
+            BAND  = f['BAND'][:].astype('U1')[self.psf_cat_inds]
             Masks = [np.where(BAND == 'r')[0], np.where(BAND == 'i')[0], np.where(BAND == 'z')[0]]
             
-            flux = f['FLUX_AUTO'][self.psf_cat_inds]
-            SNR  = flux/f['FLUXERR_AUTO'][self.psf_cat_inds]
-            ZP   = f['MAGZP'][self.psf_cat_inds]
+            flux = f['FLUX_AUTO'][:][self.psf_cat_inds]
+            SNR  = flux/f['FLUXERR_AUTO'][:][self.psf_cat_inds]
+            ZP   = f['MAGZP'][:][self.psf_cat_inds]
             mag  = ZP - 2.5 * np.log10(flux)
             
-            del flux, ZP, BAND
+            del flux, ZP
             
             #This helps avoid nan errors later down the line
             #We set the mag to 0 but we don't really use it 
@@ -960,36 +957,37 @@ class AllTests(object):
 
         del Band_Matcher, ra, dec, SNR, Masks
 
-        np.save(os.path.join(os.environ['TMPDIR'], '/psf_color_matched.npy'), out)
+        np.save(os.environ['TMPDIR'] + '/psf_color_matched.npy', out)
 
         Mask = self.get_mcal_Mask('noshear')
         with h5py.File(self.galaxy_cat, 'r') as f:
 
 
-            gal_ra  = f['RA'][self.galaxy_cat_inds][Mask]
-            gal_dec = f['DEC'][self.galaxy_cat_inds][Mask]
-            gal_w   = f['mcal_g_w'][self.galaxy_cat_inds][Mask]
-            mag_r = 30 -2.5*np.log10(f['mcal_flux_noshear'][self.galaxy_cat_inds, 0][Mask])
+            gal_ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            gal_dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            mag_r = 30 -2.5*np.log10(f['mcal_flux_noshear'][:][self.galaxy_cat_inds, 0][Mask])
 
-            mcal_m_r, mcal_m_i, mcal_m_z = 30 - 2.5*np.log10(f['mcal_flux_noshear'][self.galaxy_cat_inds][Mask]).T
+            mcal_m_r, mcal_m_i, mcal_m_z = 30 - 2.5*np.log10(f['mcal_flux_noshear'][:][self.galaxy_cat_inds][Mask]).T
             
-            print("GAL r-i [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_z, [0.025, 0.5, 0.975]), 3))
+            print("GAL r-z [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_z, [0.025, 0.5, 0.975]), 3))
+            print("GAL r-i [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_i, [0.025, 0.5, 0.975]), 3))
+            print("GAL i-z [95% bounds]", np.round(np.nanquantile(mcal_m_i - mcal_m_z, [0.025, 0.5, 0.975]), 3))
                 
         
     
         #'/project/chihway/dhayaa/DECADE/star_psf_shapecatalog_20230510.hdf5'
         with h5py.File(self.psf_cat, 'r') as f:
 
-            psf_ra, psf_dec = f['ra'][self.psf_cat_inds], f['dec'][self.psf_cat_inds]
-            ZE1 = f['g1_model_hsm'][self.psf_cat_inds]
-            ZE2 = f['g2_model_hsm'][self.psf_cat_inds]
-            ONE = f['T_star_hsm'][self.psf_cat_inds]
-            TWO = 1 - f['T_model_hsm'][self.psf_cat_inds]/f['T_star_hsm'][self.psf_cat_inds]
-            TH1 = f['g1_star_hsm'][self.psf_cat_inds] - f['g1_model_hsm'][self.psf_cat_inds]
-            TH2 = f['g2_star_hsm'][self.psf_cat_inds] - f['g2_model_hsm'][self.psf_cat_inds]
+            psf_ra, psf_dec = f['ra'][:][self.psf_cat_inds], f['dec'][:][self.psf_cat_inds]
+            ZE1 = f['g1_model_hsm'][:][self.psf_cat_inds]
+            ZE2 = f['g2_model_hsm'][:][self.psf_cat_inds]
+            ONE = f['T_star_hsm'][:][self.psf_cat_inds]
+            TWO = 1 - f['T_model_hsm'][:][self.psf_cat_inds]/f['T_star_hsm'][:][self.psf_cat_inds]
+            TH1 = f['g1_star_hsm'][:][self.psf_cat_inds] - f['g1_model_hsm'][:][self.psf_cat_inds]
+            TH2 = f['g2_star_hsm'][:][self.psf_cat_inds] - f['g2_model_hsm'][:][self.psf_cat_inds]
 
-            SNR = f['FLUX_AUTO'][self.psf_cat_inds]/f['FLUXERR_AUTO'][self.psf_cat_inds]
-            
+            SNR = f['FLUX_AUTO'][:][self.psf_cat_inds]/f['FLUXERR_AUTO'][:][self.psf_cat_inds]
             
             ########################################################################################################################
             #NOW COMPUTE STAR WEIGHTS
@@ -1000,9 +998,9 @@ class AllTests(object):
             pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
             psf_w      = weight_map[pix] #Assign individual stars weights from the map
             
-            Mask = (psf_w > 0) & (SNR > self.args['SNRCut'])
-            
-            del psf_ra, psf_dec, SNR, weight_map, gal_ra, gal_dec
+            Mask = (psf_w > 0) & (SNR > 40) & (BAND != 'g')
+                
+            del psf_ra, psf_dec, SNR, weight_map, gal_ra, gal_dec, BAND
             
             ZE1 = ZE1[Mask]
             ZE2 = ZE2[Mask]
@@ -1035,33 +1033,46 @@ class AllTests(object):
 
 
             #'/project/chihway/dhayaa/DECADE/matched_star_psf_shapecatalog_20230630.npy'
-            m_r, m_i, m_z = np.load(os.path.join(os.environ['TMPDIR'], '/psf_color_matched.npy'), mmap_mode = 'r')
+            m_r, m_i, m_z = np.load(os.environ['TMPDIR'] + '/psf_color_matched.npy', mmap_mode = 'r')
 
             for color, colorname in zip([m_r - m_z, m_i - m_z, m_r - m_i], ['rz', 'iz', 'ri']):
                     
                 color = color[Mask]
                     
+                bins = np.linspace(-0.6, 2, 20 + 1)
+                cen  = (bins[1:] + bins[:-1])/2
+
+                counts_all = np.histogram(color, bins = bins)[0]
+
+                avg1_all = np.histogram(color, bins = bins, weights = ONE)[0]
+                avg2_all = np.histogram(color, bins = bins, weights = TWO * 1e2)[0]            
+                avg3_all = np.histogram(color, bins = bins, weights = TH1 * 1e3)[0]
+                avg4_all = np.histogram(color, bins = bins, weights = TH2 * 1e3)[0]
+
                 Avg_jack = []
-                for j in range(self.Npatch):
+                for j in tqdm(range(self.Npatch), desc = 'color: %s' % colorname):
 
-                    patch_mask = psf_inds != j
+                    patch_mask = psf_inds == j
 
-                    bins = np.linspace(-0.6, 2, 20 + 1)
-                    cen  = (bins[1:] + bins[:-1])/2
+                    counts = counts_all - np.histogram(color[patch_mask], bins = bins)[0]
 
-                    counts = np.histogram(color[patch_mask], bins = bins)[0]
-
-                    avg1 = np.histogram(color[patch_mask], bins = bins, weights = ONE[patch_mask])[0]/counts
-                    avg2 = np.histogram(color[patch_mask], bins = bins, weights = TWO[patch_mask] * 1e2)[0]/counts            
-                    avg3 = np.histogram(color[patch_mask], bins = bins, weights = TH1[patch_mask] * 1e3)[0]/counts
-                    avg4 = np.histogram(color[patch_mask], bins = bins, weights = TH2[patch_mask] * 1e3)[0]/counts
-                    avg  = np.concatenate([avg1, avg2, avg3, avg4], axis = 0)
+                    avg1 = avg1_all - np.histogram(color[patch_mask], bins = bins, weights = ONE[patch_mask])[0]
+                    avg2 = avg2_all - np.histogram(color[patch_mask], bins = bins, weights = TWO[patch_mask] * 1e2)[0]            
+                    avg3 = avg3_all - np.histogram(color[patch_mask], bins = bins, weights = TH1[patch_mask] * 1e3)[0]
+                    avg4 = avg4_all - np.histogram(color[patch_mask], bins = bins, weights = TH2[patch_mask] * 1e3)[0]
+                    
+                    avg1 = avg1/counts
+                    avg2 = avg2/counts
+                    avg3 = avg3/counts
+                    avg4 = avg4/counts
+                    
+                    avg  = [avg1, avg2, avg3, avg4]
                     
                     Avg_jack.append(avg)
 
                 Avg_jack = np.array(Avg_jack)
-                np.save(os.path.join(self.output_path, + '/PSFColor_%s.npy' % colorname), Avg_jack)
-                np.save(os.path.join(self.output_path, + '/PSFColorBins_%s.npy' % colorname), cen)
+                np.save(self.output_path + '/PSFColor_%s.npy' % colorname, Avg_jack)
+                np.save(self.output_path + '/PSFColorBins_%s.npy' % colorname, cen)
 
 
     class StarMatch(object):
@@ -1313,5 +1324,7 @@ if __name__ == '__main__':
     
 #     RUNNER.brighter_fatter_effect()
 #     RUNNER.shear_vs_X()
-    RUNNER.tangential_shear_field_centers()
-    RUNNER.tangential_shear_stars()
+#     RUNNER.tangential_shear_field_centers()
+#     RUNNER.tangential_shear_stars()
+#     RUNNER.rho_stats()
+    RUNNER.psf_color()
