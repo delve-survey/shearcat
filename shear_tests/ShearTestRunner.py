@@ -14,6 +14,7 @@ from tqdm import tqdm
 import sys, os
 from datetime import datetime as dt
 import time
+from functools import lru_cache
 
 #For keeping track of how long steps take
 def timeit(func):
@@ -688,11 +689,11 @@ class AllTests(object):
             NG.process(cat_r, cat_g, low_mem=True)
             NG.write(os.path.join(self.output_path, 'starshears_%s_rands_treecorr.txt' % m_name))
             
-
+    @timeit
     def Bmodes(self):
 
 
-        nside = self.args['NSIDE']
+        nside = 1024
         npix  = hp.nside2npix(nside)
 
         Mask = self.get_mcal_Mask('noshear')
@@ -700,29 +701,30 @@ class AllTests(object):
         #Load the shape catalog
         with h5py.File(self.galaxy_cat, 'r') as f:
 
-            ra  = f['RA'][self.galaxy_cat_inds][Mask]
-            dec = f['DEC'][self.galaxy_cat_inds][Mask]
-            w   = f['mcal_g_w'][self.galaxy_cat_inds][Mask]
-            g1, g2  = f['mcal_g_noshear'][self.galaxy_cat_inds][Mask].T
+            ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            g1, g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
             
-            g2 -= g2 #Needed for Namaster definition
+            g2 = -g2 #Needed for Namaster definition
 
 
              #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [g1, g2]:
-                a -= np.average(a, weights = gal_w)
+                a -= np.average(a, weights = w)
 
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
-        gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
+        g1, g2 = g1/R11, g2/R22
 
 
-        R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = g2, w = w, NSIDE = self.args['NSIDE']); del ra, dec, g1, g2
-        X = self.BmodeRunner(R, 42, njobs = 1)
+        R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = g2, w = w, NSIDE = nside); del ra, dec, g1, g2
+        C = self.MakeMapFromCls(self.sim_Cls, NSIDE = nside)
+        X = self.BmodeRunner(R, C, 42, njobs = 1)
         data  = X.process_data()
-        Noise = X.process_noise(2_000) #Make a lot more sims so we dont get hit by Hartlap factor
+        Cov   = X.process_cov(500) #Make a lot more sims so we dont get hit by Hartlap factor
 
         np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
-        np.save(self.output_path + '/Bmode_Noise.npy', Noise)
+        np.save(self.output_path + '/Bmode_Cov.npy', Cov)
 
     @timeit
     def rho_stats(self):
@@ -1190,16 +1192,16 @@ class AllTests(object):
 
         def process(self, seed):
             
-            kappaE = hp.synfast(self.Cls, nside = self.NSIDE, pixwin = True)
+            kappaE = hp.synfast(self.Cls, nside = self.NSIDE, pixwin = True, lmax = 2*self.NSIDE)
             kappaB = np.zeros_like(kappaE)  
 
-            ell, emm = hp.Alm.getlm(lmax=self.config['Observations']['lmax'])
+            ell, emm = hp.Alm.getlm(lmax=2*self.NSIDE)
 
             with np.errstate(invalid = 'ignore', divide = 'ignore'):
-                alms   = hp.map2alm(kappaE, pol=False, use_pixel_weights = True, iter = 0)
+                alms   = hp.map2alm(kappaE, pol=False, use_pixel_weights = True, iter = 0, lmax = 2*self.NSIDE)
                 kalmsE = alms/(ell * (ell + 1.) / (ell + 2.) / (ell - 1)) ** 0.5
 
-                alms   = hp.map2alm(kappaB, pol=False, use_pixel_weights = True, iter = 0)  # Spin transform!
+                alms   = hp.map2alm(kappaB, pol=False, use_pixel_weights = True, iter = 0, lmax = 2*self.NSIDE)  # Spin transform!
                 kalmsB = alms/(ell * (ell + 1.) / (ell + 2.) / (ell - 1)) ** 0.5
 
             #Set monopole terms to 0
@@ -1248,7 +1250,7 @@ class AllTests(object):
             
             with joblib.parallel_backend("loky"):
                 
-                outputs = [self.single_run_cov(i, seeds[i]) for i in tqdm(np.arange(Nrands), desc = 'Make Rands')]
+                outputs = [self.single_run_cov(i, seeds[i]) for i in tqdm(np.arange(Nrands), desc = 'Make cov')]
                 final   = [0]*Nrands
                 for o in outputs: final[o[0]] = o[1]
 
@@ -1276,6 +1278,7 @@ class AllTests(object):
 
             A = self.MakeMapFromCat.process(seed, norand = False)
             B = self.MakeMapFromCls.process(seed)
+            
             
             e1 = A[0] + B[0]
             e2 = A[1] + B[1]
@@ -1322,9 +1325,10 @@ if __name__ == '__main__':
     RUNNER = AllTests(**args)
     
     
-#     RUNNER.brighter_fatter_effect()
-#     RUNNER.shear_vs_X()
-#     RUNNER.tangential_shear_field_centers()
-#     RUNNER.tangential_shear_stars()
-#     RUNNER.rho_stats()
+    RUNNER.brighter_fatter_effect()
+    RUNNER.shear_vs_X()
+    RUNNER.tangential_shear_field_centers()
+    RUNNER.tangential_shear_stars()
+    RUNNER.rho_stats()
     RUNNER.psf_color()
+    RUNNER.Bmodes()

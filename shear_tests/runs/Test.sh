@@ -9,7 +9,8 @@
 #SBATCH --mail-user=dhayaa@uchicago.edu
 #SBATCH --mail-type=BEGIN,END
 
-
+#X=${TMPDIR}
+#echo $TMPDIR
 if [ "$USER" == "dhayaa" ]
 then
     source /home/dhayaa/DECADE/mcal_sim_test/bash_profile.sh
@@ -19,8 +20,10 @@ fi
 shearcatalog=/project/chihway/data/decade/metacal_gold_combined_20230613.hdf
 psfcatalog=/project/chihway/dhayaa/DECADE/star_psf_shapecatalog_20230510.hdf5
 
+#echo $TMPDIR
 RUN_DIR=/home/dhayaa/DECADE/shearcat/shear_tests
-
+#TMPDIR=${X}
+#echo $TMPDIR
 NOW=$( date '+%H:%M:%S' )
 echo "Starting measure stage at $NOW"
 
@@ -29,4 +32,4 @@ python -u $RUN_DIR/ShearTestRunner.py --psf_cat "/project/chihway/dhayaa/DECADE/
                                       --psf_cat_inds "/scratch/midway3/dhayaa/SHEARTEST/psf_inds.npy" \
                                       --galaxy_cat_inds "/scratch/midway3/dhayaa/SHEARTEST/shear_inds.npy" \
                                       --output_path "/scratch/midway3/dhayaa/SHEARTEST/" \
-                                      --sim_Cls_path "/scratch/midway3/dhayaa/SHEARTEST/Cls.npy"
+                                      --sim_Cls_path "/project/chihway/dhayaa/DECADE/cosmosis/Lucas_files/Kappa_Cls.txt"
