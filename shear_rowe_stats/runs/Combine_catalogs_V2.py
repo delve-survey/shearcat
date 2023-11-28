@@ -16,8 +16,9 @@ if __name__ == '__main__':
     filelist1 = glob.glob('/project/chihway/dhayaa/DECADE/rowe_stats/DR3_1_1/output*.fits')
     filelist2 = glob.glob('/project/chihway/dhayaa/DECADE/rowe_stats/DR3_1_2/output*.fits')
     filelist3 = glob.glob('/project/chihway/dhayaa/DECADE/rowe_stats/DR3_1_2_decn30/output*.fits')
-    
-    filelist = filelist1 + filelist2 + filelist3 #Concatenate the lists
+    filelist4 = glob.glob('/project/chihway/dhayaa/DECADE/rowe_stats/DR3_1_2_Reproc/output*.fits')
+     
+    filelist = filelist1 + filelist2 + filelist3 + filelist4 #Concatenate the lists
     filelist = sorted(filelist)
     
     #Open just one file to get column names
@@ -56,7 +57,7 @@ if __name__ == '__main__':
         return np.concatenate(M) 
             
     
-    with h5py.File('/scratch/midway3/dhayaa/star_psf_shapecat_20230910.hdf5', "w") as f:
+    with h5py.File('/scratch/midway3/dhayaa/star_psf_shapecat_20231121.hdf5', "w") as f:
 
         MASK = mask(filelist)
         

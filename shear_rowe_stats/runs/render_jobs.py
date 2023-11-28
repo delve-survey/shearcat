@@ -67,7 +67,8 @@ if __name__ == '__main__':
     #                      pd.read_csv('/home/dhayaa/Desktop/DECADE/DR3_1_2_exp_paths.csv')])
 
     #Run just DR3_1_1 for now since we only have shear for that region
-    explist = '/home/dhayaa/Desktop/DECADE/DR3_1_2_DEC60_explist.csv'
+    #explist = '/home/dhayaa/Desktop/DECADE/DR3_1_2_DEC60_explist.csv'
+    explist = '/home/dhayaa/Desktop/DECADE/DR3_1_Remaining_explist.csv'
     imgname = pd.read_csv(explist)
 
     imgname = imgname.drop_duplicates().sort_values('EXPNUM')
