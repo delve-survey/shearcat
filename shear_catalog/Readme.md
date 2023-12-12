@@ -43,6 +43,11 @@ Recording the steps to get to the combined catalog `/project/chihway/data/decade
   ```
   
 * Get grid of response and sigmae to for weights:
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/response_s2n_size
+  submit_calculate_response_size_s2n.sh
+  ```
 * Add weights to final catalog:
 * Add foreground flag to final catalog:
 * Add extinction columns to final catalog:
