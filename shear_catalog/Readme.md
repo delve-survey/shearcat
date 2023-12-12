@@ -34,10 +34,16 @@ Recording the steps to get to the combined catalog `/project/chihway/data/decade
   submit_CombineGoldMetacal.sh 
   ```
 
-* Combine column-by-column:
+* Combine column-by-column, then merge to form one giant file:
 
   ```
   cd /project/chihway/chihway/shearcat/shear_catalog/notebooks/combine_column_20231212
   submit_CombineGoldMetacal_cols.sh
   python CombineGoldMetacal_final_merge.py
   ```
+  
+* Get grid of response and sigmae to for weights:
+* Add weights to final catalog:
+* Add foreground flag to final catalog:
+* Add extinction columns to final catalog:
+
