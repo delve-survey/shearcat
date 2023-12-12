@@ -16,7 +16,7 @@ col_name = sys.argv[2]
 metadata1 = np.genfromtxt('/project/chihway/chihway/shearcat/Tilelist/11072023/new_final_list_DR3_1_1.txt', dtype='str', delimiter=",")[1:]
 metadata2 = np.genfromtxt('/project/chihway/chihway/shearcat/Tilelist//07112023/new_final_list_DR3_1_2_without_rerun.txt', dtype='str', delimiter=",")[1:]
 
-metadata3 = np.genfromtxt('/project/chihway/chihway/shearcat/Tilelist//07112023/Tilelist_Reprocess_20231124.csv', dtype='str', delimiter=",")[1:]
+metadata3 = np.genfromtxt('/project/chihway/chihway/shearcat/Tilelist//07112023/Tilelist_Reprocess_20231207.csv', dtype='str', delimiter=",")[1:]
 
 import time
 
