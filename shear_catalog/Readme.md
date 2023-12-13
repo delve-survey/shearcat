@@ -53,7 +53,7 @@ Recording the steps to get to the combined catalog `/project/chihway/data/decade
 
   ```
   cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
-  CombineGoldMetacal_additional_columns.py X
+  python CombineGoldMetacal_additional_columns.py X
   # X above can be sg, foreground, weights, dered
   ```
 
