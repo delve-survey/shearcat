@@ -59,10 +59,10 @@ def get_column_mcal(column):
 
     output = []
 
-    for X in range(3):
+    for X in range(2):
 
         # range(Ntile[X])
-        for i in tqdm(range(10), desc = column):
+        for i in tqdm(range(Ntile[X]), desc = column):
 
             tile = Metadata[X][i][0]
 
@@ -74,6 +74,21 @@ def get_column_mcal(column):
                 arr = shear_cat[column][MCAL_Mask[tile]][MCAL_Sort[tile]]
                 output.append(arr)
 
+    X = 2
+
+    for i in tqdm(range(Ntile[X]), desc = column):
+
+        tile = Metadata[X][i][0]
+
+        if os.path.exists(Shear_dir[X]+'metacal_output_'+tile+'.fits') and os.path.exists(Gold_dir[X]+'gold_'+tile+'.hdf5'):
+
+            fits = fitsio.FITS(Shear_dir[X]+'metacal_output_'+tile+'.fits')
+            shear_cat = fits[1].read(vstorage='object')
+
+            arr = shear_cat[column][MCAL_Mask[tile]][MCAL_Sort[tile]]
+            output.append(arr)
+
+
     return np.concatenate(output, axis = 0)
 
 
@@ -83,7 +98,7 @@ def get_column_gold(column):
 
     for X in range(2):
         #range(Ntile[X])
-        for i in tqdm(range(10), desc = column): #6537
+        for i in tqdm(range(Ntile[X]), desc = column): #6537
 
             tile = Metadata[X][i][0]
 
@@ -98,7 +113,7 @@ def get_column_gold(column):
 
     X = 2
     #range(Ntile[X])
-    for i in tqdm(range(10), desc = column): #6537
+    for i in tqdm(range(Ntile[X]), desc = column): #6537
 
         tile = Metadata[X][i][0]
 
