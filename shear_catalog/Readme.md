@@ -41,6 +41,14 @@ Recording the steps to get to the combined catalog `/project/chihway/data/decade
   submit_CombineGoldMetacal_cols.sh
   python CombineGoldMetacal_final_merge.py
   ```
+
+* Add foreground, extinction-corrected flux, s/g flag to final catalog:
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
+  python CombineGoldMetacal_additional_columns.py X
+  # X above can be sg, foreground, dered
+  ```
   
 * Get grid of response and sigmae to for weights:
 
@@ -49,11 +57,10 @@ Recording the steps to get to the combined catalog `/project/chihway/data/decade
   submit_calculate_response_size_s2n.sh
   ```
   
-* Add weights, foreground, extinction-corrected flux, s/g flag to final catalog:
+* Add weights to final catalog:
 
   ```
   cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
-  python CombineGoldMetacal_additional_columns.py X
-  # X above can be sg, foreground, weights, dered
+  python CombineGoldMetacal_additional_columns.py weights
   ```
 
