@@ -144,9 +144,9 @@ if operation == 'weights':
             sigma_e2[i][j] = X[5]
             sigma_e2_m[i][j] = X[6]
 
-    R_gamma = (R11+R22)/2 
-    #need to check why not including R_s
-    w = (1./(sigma_e2*R_gamma**(-2))).T
+    R_tot = (R11+R11s+R22+R22s)/2 
+    # in Y3, Rs was not included here
+    w = (1./(sigma_e2*R_tot**(-2))).T
 
     with h5py.File(master_cat, 'r') as h5r:
         size_ratio = h5r['mcal_T_ratio_noshear'][:]
