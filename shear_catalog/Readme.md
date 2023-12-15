@@ -63,4 +63,11 @@ Recording the steps to get to the combined catalog `/project/chihway/data/decade
   cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
   python CombineGoldMetacal_additional_columns.py weights
   ```
+* Make mask for metacal cuts on catalog, this outputs file to `/project/chihway/data/decade/metacal_gold_combined_mask_20231212.hdf`, which we may want to just add to the master catalog after combining with tomographic information
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
+  python MakeMcalMask.py
+  ```
+  
 
