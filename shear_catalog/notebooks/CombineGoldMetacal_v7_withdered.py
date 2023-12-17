@@ -211,42 +211,50 @@ with h5py.File(path, "w") as f:
         
         
     #Deredden quantities
-    EXTINCTION = hp.read_map('/project/chihway/dhayaa/DECADE/Imsim_Inputs/ebv_sfd98_fullres_nside_4096_ring_equatorial.fits')
-    R_SFD98    = EXTINCTION[hp.ang2pix(4096, f['RA'][:], f['DEC'][:], lonlat = True)]
-    Ag, Ar, Ai, Az = R_SFD98*3.186, R_SFD98*2.140, R_SFD98*1.569, R_SFD98*1.196
-    
-    #Metacal first
-    for c in ['mcal_flux_1m', 'mcal_flux_1p', 'mcal_flux_2m', 'mcal_flux_2p', 'mcal_flux_err_1m', 'mcal_flux_err_1p',
-              'mcal_flux_err_2m', 'mcal_flux_err_2p', 'mcal_flux_err_noshear', 'mcal_flux_noshear']:
+    for name in ['SFD98', 'Planck13']:
         
-        print(c + '_dered')
-        arr = f[c][:]
-        
-        arr[:, 0] *= 10**(Ar/2.5)
-        arr[:, 1] *= 10**(Ai/2.5)
-        arr[:, 2] *= 10**(Az/2.5)
-        
-        f.create_dataset(c + '_dered', data = arr)
-        
-    for c in ['FLUX_AUTO_G', 'FLUX_AUTO_R', 'FLUX_AUTO_I', 'FLUX_AUTO_Z', 
-              'FLUXERR_AUTO_G', 'FLUXERR_AUTO_R', 'FLUXERR_AUTO_I', 'FLUXERR_AUTO_Z', 
-              'BDF_FLUX_G', 'BDF_FLUX_R', 'BDF_FLUX_I', 'BDF_FLUX_Z',  
-              'BDF_FLUX_ERR_G', 'BDF_FLUX_ERR_R', 'BDF_FLUX_ERR_I', 'BDF_FLUX_ERR_Z']:
-        
-        print(c + '_dered')
-        arr = f[c][:]
-        
-        if c[-1] == 'G': arr *= 10**(Ag/2.5)
-        elif c[-1] == 'R': arr *= 10**(Ar/2.5)
-        elif c[-1] == 'I': arr *= 10**(Ai/2.5)
-        elif c[-1] == 'Z': arr *= 10**(Az/2.5)
+        if name == 'SFD98':
+            EXTINCTION = hp.read_map('/project/chihway/dhayaa/DECADE/Extinction_Maps/ebv_sfd98_nside_4096_ring_equatorial.fits')
+            R_SFD98    = EXTINCTION[hp.ang2pix(4096, f['RA'][:], f['DEC'][:], lonlat = True)]
+            Ag, Ar, Ai, Az = R_SFD98*3.186, R_SFD98*2.140, R_SFD98*1.569, R_SFD98*1.196
             
-        f.create_dataset(c + '_DERED', data = arr)
-        
-    f.create_dataset('Ag', data = Ag)
-    f.create_dataset('Ar', data = Ar)
-    f.create_dataset('Ai', data = Ai)
-    f.create_dataset('Az', data = Az)
+        elif name == 'Planck13':
+            EXTINCTION = hp.read_map('/project/chihway/dhayaa/DECADE/Extinction_Maps/ebv_planck13_nside_4096_ring_equatorial.fits')
+            R_PLK13    = EXTINCTION[hp.ang2pix(4096, f['RA'][:], f['DEC'][:], lonlat = True)]
+            Ag, Ar, Ai, Az = R_PLK13*4.085, R_PLK13*2.744, R_PLK13*2.012, R_PLK13*1.533
+            
+        #Metacal first
+        for c in ['mcal_flux_1m', 'mcal_flux_1p', 'mcal_flux_2m', 'mcal_flux_2p', 'mcal_flux_err_1m', 'mcal_flux_err_1p',
+                  'mcal_flux_err_2m', 'mcal_flux_err_2p', 'mcal_flux_err_noshear', 'mcal_flux_noshear']:
+
+            print(c + '_dered')
+            arr = f[c][:]
+
+            arr[:, 0] *= 10**(Ar/2.5)
+            arr[:, 1] *= 10**(Ai/2.5)
+            arr[:, 2] *= 10**(Az/2.5)
+
+            f.create_dataset(c + '_dered_' + name.lower(), data = arr)
+
+        for c in ['FLUX_AUTO_G', 'FLUX_AUTO_R', 'FLUX_AUTO_I', 'FLUX_AUTO_Z', 
+                  'FLUXERR_AUTO_G', 'FLUXERR_AUTO_R', 'FLUXERR_AUTO_I', 'FLUXERR_AUTO_Z', 
+                  'BDF_FLUX_G', 'BDF_FLUX_R', 'BDF_FLUX_I', 'BDF_FLUX_Z',  
+                  'BDF_FLUX_ERR_G', 'BDF_FLUX_ERR_R', 'BDF_FLUX_ERR_I', 'BDF_FLUX_ERR_Z']:
+
+            print(c + '_dered')
+            arr = f[c][:]
+
+            if c[-1] == 'G': arr *= 10**(Ag/2.5)
+            elif c[-1] == 'R': arr *= 10**(Ar/2.5)
+            elif c[-1] == 'I': arr *= 10**(Ai/2.5)
+            elif c[-1] == 'Z': arr *= 10**(Az/2.5)
+
+            f.create_dataset(c + '_DERED_' + name.upper(), data = arr)
+
+        f.create_dataset('Ag_' + name.lower(), data = Ag)
+        f.create_dataset('Ar_' + name.lower(), data = Ar)
+        f.create_dataset('Ai_' + name.lower(), data = Ai)
+        f.create_dataset('Az_' + name.lower(), data = Az)
     
         
 print(time.ctime())
