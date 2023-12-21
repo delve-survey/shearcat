@@ -57,7 +57,7 @@ def get_baseline_mcal_mask():
         print(shear_type)
 
         with h5py.File(master_cat, 'r') as h5r:
-            flux_r, flux_i, flux_z = h5r['mcal_flux_'+shear_type][:].T
+            flux_r, flux_i, flux_z = h5r['mcal_flux_'+shear_type+'_dered_sfd98'][:].T
 
         mcal_pz_mask, mag_r = get_mcal_pz_mask(flux_r, flux_i, flux_z)
         del flux_r, flux_i, flux_z
@@ -105,7 +105,7 @@ mask_total_X = get_baseline_mcal_mask()
 print("total number of galaxies", len(mask_total_X['noshear'])) 
 print("after cut", np.sum(mask_total_X['noshear']), np.sum(mask_total_X['1p']), np.sum(mask_total_X['1m']), np.sum(mask_total_X['2p']), np.sum(mask_total_X['2m']))
 
-with h5py.File(master_mask, 'a') as h5r:
+with h5py.File(master_mask, 'w') as h5r:
     h5r.create_dataset('baseline_mcal_mask_noshear', data = mask_total_X['noshear'])
     h5r.create_dataset('baseline_mcal_mask_1p', data = mask_total_X['1p'])
     h5r.create_dataset('baseline_mcal_mask_1m', data = mask_total_X['1m'])
