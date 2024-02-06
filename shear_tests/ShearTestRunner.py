@@ -47,6 +47,9 @@ class AllTests(object):
         self.output_path = output_path
 
         self.sim_Cls = np.loadtxt(sim_Cls_path) #Cls to use in making Gaussian mocks for covariance 
+        
+#         self.dered = '_dered_sfd98'
+        self.dered = ''
 
 
     @timeit
@@ -132,6 +135,7 @@ class AllTests(object):
     @timeit
     def get_mcal_Mask(self, label):
     
+        dered = self.dered
         if os.path.isfile(os.environ['TMPDIR'] + '/MASK_%s.npy' % label):
             Mask = np.load(os.environ['TMPDIR'] + '/MASK_%s.npy' % label)
             
@@ -147,15 +151,22 @@ class AllTests(object):
                 e1, e2  = f[f'mcal_g_{label}'][:][self.galaxy_cat_inds].T 
 
                 with np.errstate(invalid = 'ignore', divide = 'ignore'):
-                    mag_r   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 0][self.galaxy_cat_inds])
-                    mag_i   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 1][self.galaxy_cat_inds])
-                    mag_z   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:, 2][self.galaxy_cat_inds])
+                    mag_r   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}{dered}'][:, 0][self.galaxy_cat_inds])
+                    mag_i   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}{dered}'][:, 1][self.galaxy_cat_inds])
+                    mag_z   = 30 - 2.5*np.log10(f[f'mcal_flux_{label}{dered}'][:, 2][self.galaxy_cat_inds])
 
                 SNR     = f[f'mcal_s2n_{label}'][:][self.galaxy_cat_inds]
                 T_ratio = f[f'mcal_T_ratio_{label}'][:][self.galaxy_cat_inds]
                 T       = f[f'mcal_T_{label}'][:][self.galaxy_cat_inds]
                 flags   = f['mcal_flags'][:][self.galaxy_cat_inds]
-                sg_bdf  = f['sg_bdf'][:][self.galaxy_cat_inds]
+                
+#                 if 'sg_bdf' in f.keys():
+#                     sg_bdf  = f['sg_bdf'][:][self.galaxy_cat_inds]
+#                 else:
+#                     sg_bdf  = np.ones_like(T) * 99
+
+                print("FORCING SG BDF TO PASS EVERYWHERE")
+                sg_bdf  = np.ones_like(T) * 99
 
             # We don't use the gold cuts, as the expectations is to include them
             # in the indices that are passed in.
@@ -309,8 +320,9 @@ class AllTests(object):
                     f_2 = keymatch[q.split('_')[2]]
 
                     def get_color(label):
-                        c1 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:][self.galaxy_cat_inds, f_1])
-                        c2 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}'][:][self.galaxy_cat_inds, f_2])
+                        dered = self.dered
+                        c1 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}{dered}'][:][self.galaxy_cat_inds, f_1])
+                        c2 = 30 - 2.5*np.log10(f[f'mcal_flux_{label}{dered}'][:][self.galaxy_cat_inds, f_2])
 
                         return c1 - c2
 
@@ -504,6 +516,7 @@ class AllTests(object):
         center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
 
         Nth    = int(len(gal_ra)/10_000_000) #Select every Nth object such that we end up using 10 million to define patches
+        if Nth < 1: Nth = 1
         small_cat = treecorr.Catalog(ra=gal_ra[::Nth], dec=gal_dec[::Nth], ra_units='deg',dec_units='deg', npatch = self.Npatch)
         small_cat.write_patch_centers(center_path)
         del small_cat 
@@ -666,6 +679,7 @@ class AllTests(object):
             center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
 
             Nth    = int(len(gal_ra)/10_000_000) #Select every Nth object such that we end up using 10 million to define patches
+            if Nth < 1: Nth = 1
             small_cat = treecorr.Catalog(ra=gal_ra[::Nth], dec=gal_dec[::Nth], ra_units='deg',dec_units='deg', npatch = self.Npatch)
             small_cat.write_patch_centers(center_path)
             del small_cat 
@@ -704,11 +718,9 @@ class AllTests(object):
             ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
             dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
             w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            #w   = np.ones_like(w)
             g1, g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
             
-            g2 = -g2 #Needed for Namaster definition
-
-
              #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [g1, g2]:
                 a -= np.average(a, weights = w)
@@ -716,15 +728,38 @@ class AllTests(object):
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         g1, g2 = g1/R11, g2/R22
 
-
-        R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = g2, w = w, NSIDE = nside); del ra, dec, g1, g2
+        #Need a -1 for g2 due to Namaster definition
+#         T = treecorr.Catalog(g1 = g1[::], g2 = g2[::], ra = ra[::], dec = dec[::], w = w[::], ra_units='deg',dec_units='deg', npatch = self.Npatch)
+        R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = -g2, w = w, NSIDE = nside); del ra, dec, g1, g2
         C = self.MakeMapFromCls(self.sim_Cls, NSIDE = nside)
-        X = self.BmodeRunner(R, C, 42, njobs = 1)
-        data  = X.process_data()
-        Cov   = X.process_cov(500) #Make a lot more sims so we dont get hit by Hartlap factor
+        
+        #Process regular Bmodes
+        X    = self.BmodeRunner(R, C, 42, njobs = 1)
+        data = X.process_data()
+        Cov  = X.process_noise(500) #Make a lot more sims so we dont get hit by Hartlap factor
 
         np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
-        np.save(self.output_path + '/Bmode_Cov.npy', Cov)
+        np.save(self.output_path + '/Bmode_Noise.npy', Cov)
+
+
+        #Process pure Bmodes
+        X    = self.PureBmodeRunner(R, C, 42, njobs = 1)
+        data = X.process_data()
+        Cov  = X.process_noise(500) #Make a lot more sims so we dont get hit by Hartlap factor
+
+        np.save(self.output_path + '/PureBmode.npy', np.vstack([data,  X.ell_eff]))
+        np.save(self.output_path + '/PureBmode_Noise.npy', Cov)
+        
+        
+        #Process Matt's real-space E/B estimator
+        X = self.MRBmodeRunner(T, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 40)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_treecorr.txt'))
+        np.save(self.output_path + '/MRBmode_E.npy', E)
+        np.save(self.output_path + '/MRBmode_B.npy', B)
+        np.save(self.output_path + '/MRBmode_E_Cov.npy', cov_E)
+        np.save(self.output_path + '/MRBmode_B_Cov.npy', cov_B)
+        
 
     @timeit
     def rho_stats(self):
@@ -817,6 +852,7 @@ class AllTests(object):
 
         center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
         Nth    = int(len(gal_g1)/20_000_000) #Select every Nth object such that we end up using 20 million to define patches
+        if Nth < 1: Nth = 1
         small_cat = treecorr.Catalog(g1=gal_g1[::Nth], g2=gal_g1[::Nth], ra=gal_ra[::Nth], dec=gal_dec[::Nth], 
                                      ra_units='deg', dec_units='deg', npatch = self.Npatch)
         small_cat.write_patch_centers(center_path)
@@ -839,7 +875,7 @@ class AllTests(object):
         ########################################################################################################################
 
         GG = treecorr.GGCorrelation(nbins = 25, min_sep = 0.1, max_sep = 250,
-                                    sep_units = 'arcmin',verbose = 0,bin_slop = 0.001, var_method='jackknife')
+                                    sep_units = 'arcmin',verbose = 0,bin_slop = 0.01, var_method='jackknife')
         GG.process(cat_g, low_mem=True)
         GG.write(os.path.join(self.output_path, 'taustats_shear_2pt_treecorr.txt'))
 
@@ -894,7 +930,146 @@ class AllTests(object):
         cov_jk = treecorr.estimate_multi_cov([GG, EE, QQ, EQ, WW, QW, EW, GE, GQ, GW], 'jackknife')
         np.savetxt(os.path.join(self.output_path, 'taustats_All_cov_treecorr.txt'), cov_jk)
 
-    
+    @timeit
+    def MRBmode_psf(self):
+        
+        with h5py.File(self.psf_cat, 'r') as f:
+        
+            psf_ra   = f['ra'][:][self.psf_cat_inds]
+            psf_dec  = f['dec'][:][self.psf_cat_inds]
+
+            g1_star  = f['g1_star_hsm'][:][self.psf_cat_inds]
+            g2_star  = f['g2_star_hsm'][:][self.psf_cat_inds]
+            g1_model = f['g1_model_hsm'][:][self.psf_cat_inds]
+            g2_model = f['g2_model_hsm'][:][self.psf_cat_inds]
+
+            w1 = g1_star * (f['T_star_hsm'][:][self.psf_cat_inds] - f['T_model_hsm'][:][self.psf_cat_inds])/f['T_star_hsm'][:][self.psf_cat_inds]
+            w2 = g2_star * (f['T_star_hsm'][:][self.psf_cat_inds] - f['T_model_hsm'][:][self.psf_cat_inds])/f['T_star_hsm'][:][self.psf_cat_inds]
+
+            q1 = g1_star - g1_model
+            q2 = g2_star - g2_model
+
+            del g1_star, g2_star
+            
+            band = np.array(f['BAND'][:]).astype('U1')[self.psf_cat_inds]
+            mag  = f['MAGZP'][:][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'][:])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
+            SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
+            
+            No_Gband  = band != 'g' #We don't use g-band in shear
+            SNR_Mask  = SNR > 40
+
+            print(np.sum(No_Gband), np.sum(SNR_Mask))
+            Mask = SNR_Mask & No_Gband
+            
+            print("TOTAL NUM", np.sum(Mask))
+            psf_ra   = psf_ra[Mask]
+            psf_dec  = psf_dec[Mask]
+            g1_model = g1_model[Mask]
+            g2_model = g2_model[Mask]
+            q1  = q1[Mask]
+            q2  = q2[Mask]
+            w1  = w1[Mask]
+            w2  = w2[Mask]
+            
+            del Mask, SNR_Mask, No_Gband, band, mag, SNR
+        
+        print("LOADED EVERYTHING")
+
+        NSIDE      = 256
+        weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
+        pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
+        psf_w      = weight_map[pix] #Assign individual stars weights from the map
+
+        #Remove stars that are not in the galaxy sample's footprint
+        Mask     = psf_w > 0
+        psf_ra   = psf_ra[Mask]
+        psf_dec  = psf_dec[Mask]
+        psf_w    = psf_w[Mask]
+        q1, q2   = q1[Mask], q2[Mask]
+        w1, w2   = w1[Mask], w2[Mask]
+        g1_model = g1_model[Mask]
+        g2_model = g2_model[Mask]
+        del pix
+
+        print("LOADED EVERYTHING")
+
+        #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
+        for a in [gal_g1, gal_g2]:
+            a -= np.average(a, weights = gal_w)
+            
+        for a in [g1_model, g2_model, q1, q2, w1, w2]:
+            a -= np.average(a, weights = psf_w)
+
+
+        if os.path.isfile(os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'):
+            os.system('rm %s' % os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp')
+        
+        center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
+        Nth    = int(len(psf_ra)/20_000_000) #Select every Nth object such that we end up using 20 million to define patches
+        if Nth < 1: Nth = 1
+        small_cat = treecorr.Catalog(ra=psf_ra[::Nth], dec=psf_dec[::Nth],  ra_units='deg', dec_units='deg', npatch = self.Npatch)
+        small_cat.write_patch_centers(center_path)
+        del small_cat
+                          
+              
+        def custom_write(label, E, B, cov_E, cov_B):
+        
+            np.save(self.output_path + '/MRBmode_%s_E.npy' % label, E)
+            np.save(self.output_path + '/MRBmode_%s_B.npy' % label, B)
+            np.save(self.output_path + '/MRBmode_%s_E_Cov.npy' % label, cov_E)
+            np.save(self.output_path + '/MRBmode_%s_B_Cov.npy' % label, cov_B)
+        
+        
+        ########################################################################################################################
+        #NOW MAKE THE CATALOGS
+        ########################################################################################################################
+        
+        #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
+        cat_e = treecorr.Catalog(g1=g1_model, g2=g2_model, ra=psf_ra, dec=psf_dec, w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
+        cat_q = treecorr.Catalog(g1=q1,       g2=q2,       ra=psf_ra, dec=psf_dec, w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
+        cat_w = treecorr.Catalog(g1=w1,       g2=w2,       ra=psf_ra, dec=psf_dec, w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
+
+        ########################################################################################################################
+        #Compute the rowe stats
+        ########################################################################################################################
+
+        #Process Matt's real-space E/B estimator
+        X = self.MRBmodeRunner(cat_e, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_EE_treecorr.txt'))
+        custom_write('EE', E, B, cov_E, cov_B)
+        
+        
+        X = self.MRBmodeRunner(cat_q, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_QQ_treecorr.txt'))
+        custom_write('QQ', E, B, cov_E, cov_B)
+        
+        
+        X = self.MRBmodeRunner(cat_e, cat_q, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_EQ_treecorr.txt'))
+        custom_write('EQ', E, B, cov_E, cov_B)
+        
+        
+        X = self.MRBmodeRunner(cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_WW_treecorr.txt'))
+        custom_write('WW', E, B, cov_E, cov_B)
+        
+        
+        X = self.MRBmodeRunner(cat_q, cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_QW_treecorr.txt'))
+        custom_write('QW', E, B, cov_E, cov_B)
+        
+        
+        X = self.MRBmodeRunner(cat_e, cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_EW_treecorr.txt'))
+        custom_write('EW', E, B, cov_E, cov_B)
+        
+        
     @timeit
     def psf_color(self):
 
@@ -960,17 +1135,18 @@ class AllTests(object):
         del Band_Matcher, ra, dec, SNR, Masks
 
         np.save(os.environ['TMPDIR'] + '/psf_color_matched.npy', out)
+        np.save(os.environ['TMPDIR'] + '/psf_color_pos.npy', np.vstack([matched_ra, matched_dec]).T)
 
         Mask = self.get_mcal_Mask('noshear')
         with h5py.File(self.galaxy_cat, 'r') as f:
 
-
+            dered   = self.dered
             gal_ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
             gal_dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
             gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
-            mag_r = 30 -2.5*np.log10(f['mcal_flux_noshear'][:][self.galaxy_cat_inds, 0][Mask])
+            mag_r = 30 -2.5*np.log10(f[f'mcal_flux_noshear{dered}'][:][self.galaxy_cat_inds, 0][Mask])
 
-            mcal_m_r, mcal_m_i, mcal_m_z = 30 - 2.5*np.log10(f['mcal_flux_noshear'][:][self.galaxy_cat_inds][Mask]).T
+            mcal_m_r, mcal_m_i, mcal_m_z = 30 - 2.5*np.log10(f[f'mcal_flux_noshear{dered}'][:][self.galaxy_cat_inds][Mask]).T
             
             print("GAL r-z [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_z, [0.025, 0.5, 0.975]), 3))
             print("GAL r-i [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_i, [0.025, 0.5, 0.975]), 3))
@@ -1000,8 +1176,40 @@ class AllTests(object):
             pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
             psf_w      = weight_map[pix] #Assign individual stars weights from the map
             
-            Mask = (psf_w > 0) & (SNR > 40) & (BAND != 'g')
+            ########################################################################################################################
+            #NOW AVERAGE ACROSS FOOTPRINTS
+            ########################################################################################################################
+            
+            for SNR_threshold in [20, 40, 60, 80]:
                 
+                print("\n--------------------------------------------------------------")
+                print("--------------------------------------------------------------")
+                print("AVERAGE PSF QUANTITIES")
+                print("SNR = ", SNR_threshold)
+                print("--------------------------------------------------------------")
+                print("--------------------------------------------------------------")
+                
+                Mask = (psf_w > 0) & (SNR > SNR_threshold) & (BAND != 'g')
+                
+                print("<p> e1_psf:", np.average(ZE1[Mask], weights = psf_w[Mask]))
+                print("<p> e2_psf:", np.average(ZE2[Mask], weights = psf_w[Mask]))
+
+
+                print("<q> e1_err:", np.average(TH1[Mask], weights = psf_w[Mask]))
+                print("<q> e2_err:", np.average(TH2[Mask], weights = psf_w[Mask]))
+
+
+                print("<T> T_err:", np.average(TWO[Mask], weights = psf_w[Mask]))
+                print("sig(T) T_err:", np.sqrt(np.average(TWO[Mask]**2, weights = psf_w[Mask]) - 
+                                               np.average(TWO[Mask], weights = psf_w[Mask])**2))
+            
+            
+            ########################################################################################################################
+            #GET QUANTITIES FOR  COLOR DEP.
+            ########################################################################################################################
+                
+            Mask = (psf_w > 0) & (SNR > 40) & (BAND != 'g')
+            
             del psf_ra, psf_dec, SNR, weight_map, gal_ra, gal_dec, BAND
             
             ZE1 = ZE1[Mask]
@@ -1013,21 +1221,6 @@ class AllTests(object):
             
             psf_w = psf_w[Mask] 
             
-            
-            ########################################################################################################################
-            #NOW AVERAGE ACROSS FOOTPRINTS
-            ########################################################################################################################
-            
-            print("<p> e1_psf:", np.average(ZE1, weights = psf_w))
-            print("<p> e2_psf:", np.average(ZE2, weights = psf_w))
-            
-            
-            print("<q> e1_err:", np.average(TH1, weights = psf_w))
-            print("<q> e2_err:", np.average(TH2, weights = psf_w))
-            
-            
-            print("<T> T_err:", np.average(TWO, weights = psf_w))
-            print("sig(T) T_err:", np.sqrt(np.average(TWO**2, weights = psf_w) - np.average(TWO, weights = psf_w)**2))
             
             ########################################################################################################################
             #NOW COMPUTE COLOR DEPENDENT QUANTITIES
@@ -1301,6 +1494,121 @@ class AllTests(object):
             cl_decoupled = self.w.decouple_cell(cl_coupled)
 
             return cl_decoupled
+        
+    
+    class PureBmodeRunner(BmodeRunner):
+
+        tmp_bins = np.linspace(np.sqrt(8), np.sqrt(2048), 33)**2
+        tmp_bins = tmp_bins.astype(int)
+
+        def __init__(self, MakeMapFromCat, MakeMapFromCls, seed, bins = tmp_bins, apodised_scale = 5/60, njobs = -1):
+
+            super().__init__(MakeMapFromCat, MakeMapFromCls, seed, bins, njobs)
+
+            np.save(os.environ['TMPDIR'] + '/MakeMapFromCat.npy', MakeMapFromCat.mask_sims.astype(float))
+            self.mask = nmt.mask_apodization(MakeMapFromCat.mask_sims.astype(np.float64), apodised_scale, apotype='C1')
+            print("Apodizing the mask: Needed for purifying B-modes") 
+
+            #Redo mode coupling
+            m = nmt.NmtField(self.mask, None, spin = 2)
+            w = nmt.NmtWorkspace()
+            w.compute_coupling_matrix(m, m, self.bins)
+            
+            self.w = w
+
+
+        def measure_NamasterCls(self, e1, e2):
+
+            field = nmt.NmtField(self.mask, [e1, e2], purify_b = True)
+            
+            cl_coupled   = nmt.compute_coupled_cell(field, field)
+            cl_decoupled = self.w.decouple_cell(cl_coupled)
+
+            return cl_decoupled
+        
+        
+    class MRBmodeRunner(object):
+        
+        def __init__(self, TreeCat, TreeCat2 = None, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20):
+            
+            self.theta_min = theta_min
+            self.theta_max = theta_max
+            self.Ntheta    = Ntheta
+            self.Nmodes    = Nmodes
+            self.TreeCat   = TreeCat
+            self.TreeCat2  = TreeCat2
+
+        
+        def compute_treecorr(self):
+            
+            Xi = treecorr.GGCorrelation(min_sep = self.theta_min, max_sep = self.theta_max, nbins = self.Ntheta,
+                                        sep_units = 'arcmin', var_method = 'jackknife', bin_slop = 0.01)
+            
+            if self.TreeCat2 is None:
+                Xi.process(self.TreeCat)
+            else:
+                Xi.process(self.TreeCat, self.TreeCat2)
+            
+            
+            return Xi
+        
+        
+        def setup_kernel(self):
+            
+            FILE = os.environ['TMPDIR'] + '/EB_Coefficients.npy'
+            
+            if os.path.isfile(FILE):
+                
+                print("COEFF FILE (%s) EXISTS. NOT RERUNNING" % FILE)
+            
+            else:
+                import hybrideb
+
+                heb = hybrideb.HybridEB(self.theta_min, self.theta_max, self.Ntheta)
+                beb = hybrideb.BinEB(self.theta_min, self.theta_max, self.Ntheta)
+                geb = hybrideb.GaussEB(beb, heb, Nl = self.Nmodes)
+
+                np.save(FILE, np.array([geb(i) for i in range(self.Nmodes)]))
+            
+        @timeit
+        def compute_EB(self):
+            
+            correlator = self.compute_treecorr()
+            self.setup_kernel()
+            
+            E = self._get_E([correlator])
+            B = self._get_B([correlator])
+            
+            cov_E = treecorr.estimate_multi_cov([correlator], 'jackknife', func = self._get_E)
+            cov_B = treecorr.estimate_multi_cov([correlator], 'jackknife', func = self._get_B)
+            
+            return E, B, cov_E, cov_B, correlator
+        
+
+        def _get_E(self, corr): return self._get_EB(corr, E_mode = True)
+        def _get_B(self, corr): return self._get_EB(corr, E_mode = False)
+        
+        def _get_EB(self, corr, E_mode = True):   
+        
+            xip = corr[0].xip
+            xim = corr[0].xim
+            
+            N = np.ones(self.Nmodes)
+            
+            for i in range(self.Nmodes):
+                
+                res = np.load(os.environ['TMPDIR'] + '/EB_Coefficients.npy', allow_pickle = True)[i]
+                fp  = res[1]
+                fm  = res[2]
+            
+                # X+ = np.sum((fp*xip + fm*xim)/2)
+                # X- = np.sum((fp*xip - fm*xim)/2)
+                if E_mode == True:
+                    N[i] = np.sum(fp*xip + fm*xim)/2
+                else:
+                    N[i] = np.sum(fp*xip - fm*xim)/2
+                
+            return N
             
         
 
@@ -1318,17 +1626,35 @@ if __name__ == '__main__':
     my_parser.add_argument('--galaxy_cat_inds', action='store', type = str, required = True)
     my_parser.add_argument('--output_path',     action='store', type = str, required = True)
     my_parser.add_argument('--sim_Cls_path',    action='store', type = str, required = True)
-
+    
+    
+    my_parser.add_argument('--All',              action='store_true', default = False)
+    my_parser.add_argument('--brighter_fatter',  action='store_true', default = False)
+    my_parser.add_argument('--shear_vs_X',       action='store_true', default = False)
+    my_parser.add_argument('--gt_field_centers', action='store_true', default = False)
+    my_parser.add_argument('--gt_stars',         action='store_true', default = False)
+    my_parser.add_argument('--rho_stats',        action='store_true', default = False)
+    my_parser.add_argument('--psf_color',        action='store_true', default = False)
+    my_parser.add_argument('--Bmodes',           action='store_true', default = False)
+    my_parser.add_argument('--MRBmode_psf',      action='store_true', default = False)
+    
+    
     args  = vars(my_parser.parse_args())
+    cargs = {k:args[k] for k in list(args.keys())[:6]}
     
     
-    RUNNER = AllTests(**args)
+    RUNNER = AllTests(**cargs)
     
     
-    RUNNER.brighter_fatter_effect()
-    RUNNER.shear_vs_X()
-    RUNNER.tangential_shear_field_centers()
-    RUNNER.tangential_shear_stars()
-    RUNNER.rho_stats()
-    RUNNER.psf_color()
-    RUNNER.Bmodes()
+    if np.logical_or(args['All'], args['brighter_fatter']):  RUNNER.brighter_fatter_effect()
+    if np.logical_or(args['All'], args['shear_vs_X']):       RUNNER.shear_vs_X()
+    if np.logical_or(args['All'], args['gt_field_centers']): RUNNER.tangential_shear_field_centers()
+    if np.logical_or(args['All'], args['gt_stars']):         RUNNER.tangential_shear_stars()
+    if np.logical_or(args['All'], args['rho_stats']):        RUNNER.rho_stats()
+    if np.logical_or(args['All'], args['psf_color']):        RUNNER.psf_color()
+    if np.logical_or(args['All'], args['Bmodes']):           RUNNER.Bmodes()
+    
+    #This takes really long time so we run it separately, always!
+    if args['MRBmode_psf']: RUNNER.MRBmode_psf()
+        
+    
