@@ -57,7 +57,9 @@ def get_baseline_mcal_mask():
         print(shear_type)
 
         with h5py.File(master_cat, 'r') as h5r:
-            flux_r, flux_i, flux_z = h5r['mcal_flux_'+shear_type+'_dered_sfd98'][:].T
+            # this is the correct thing to do, but we are reverting to the old version to match the tomographic binning
+            #flux_r, flux_i, flux_z = h5r['mcal_flux_'+shear_type+'_dered_sfd98'][:].T
+            flux_r, flux_i, flux_z = h5r['mcal_flux_'+shear_type][:].T
 
         mcal_pz_mask, mag_r = get_mcal_pz_mask(flux_r, flux_i, flux_z)
         del flux_r, flux_i, flux_z
@@ -79,7 +81,7 @@ def get_baseline_mcal_mask():
         with h5py.File(master_cat, 'r') as h5r:
 
             sg = h5r['FLAGS_FOREGROUND'][:]*0+4
-            # this is a hack
+            # this is a hack because we don't have fitvd
             #     sg = h5r['sg_bdf'][:]
             fg = h5r['FLAGS_FOREGROUND'][:]
 
@@ -91,7 +93,7 @@ def get_baseline_mcal_mask():
         del mcal_pz_mask, mcal_mask, sgfg_mask
 
         print('got mask for '+shear_type)
-        Mask[shear_type] = mask_total_X
+        Mask[shear_type] = mask_total_X.astype('int')
 
         del mask_total_X
 
@@ -104,6 +106,37 @@ print("get the total baseline mask with selection...")
 mask_total_X = get_baseline_mcal_mask()
 print("total number of galaxies", len(mask_total_X['noshear'])) 
 print("after cut", np.sum(mask_total_X['noshear']), np.sum(mask_total_X['1p']), np.sum(mask_total_X['1m']), np.sum(mask_total_X['2p']), np.sum(mask_total_X['2m']))
+
+# read in tomography catalogs
+RES = np.load('/project/chihway/raulteixeira/data/ID_MATCHED_DR3_1_20240123.npy')
+ids = RES[:,0]
+tomo = RES[:, 1] #Tomobins from Raul.
+tomo = tomo[ids>-1] + 1.
+on_mask = (mask_total_X['noshear']==1)
+mask_total_X['noshear'][on_mask] = tomo.copy()
+
+#tomo_dir = '/project/chihway/raulteixeira/data/'
+#tomo_file = tomo_dir +'/DR3_1_ID+TomoBin.hdf5'
+#with h5py.File(tomo_file, 'r') as f:
+#    tomo = f['df/block0_values'][:][:,1]+1
+#    print(tomo)
+#on_mask = (mask_total_X['noshear']==1)
+#mask_total_X['noshear'][on_mask] = tomo.copy()
+
+for shear_type in ['1p', '1m', '2p', '2m']:
+#    tomo_file = tomo_dir +'classify_sfd98_'+str(shear_type)+'/DR3_1_ID+TomoBin.hdf5'
+#    with h5py.File(tomo_file, 'r') as f:
+#        tomo = f['df/block0_values'][:][:,1]+1
+#        print(tomo)
+    print(shear_type)
+    RES = np.load('/project/chihway/raulteixeira/data/ID_MATCHED_'+str(shear_type)+'_DR3_1_20240123.npy')
+    ids = RES[:,0]
+    tomo = RES[:, 1] #Tomobins from Raul.
+    tomo = tomo[ids>-1] + 1.
+    on_mask = (mask_total_X[shear_type]==1)
+    mask_total_X[shear_type][on_mask] = tomo.copy()
+    print(mask_total_X[shear_type][on_mask])
+    print(tomo)
 
 with h5py.File(master_mask, 'w') as h5r:
     h5r.create_dataset('baseline_mcal_mask_noshear', data = mask_total_X['noshear'])
