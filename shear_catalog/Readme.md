@@ -1,5 +1,22 @@
 # Log file
 
+## 2024-02-09
+
+* We combined all the tile lists into a single one using the script: , the final list is here.
+  
+* Metacal was run previously with separate batches, see log file 2023-12-12  
+
+* Download SE catalogs:
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/notebook
+  python QueryGold_v2.py
+  cd /project/chihway/chihway/shearcat/shear_catalog/measurement
+  gold_cuts_v2.sh
+  ```
+
+
+
 ## 2023-12-12
 
 Recording the steps to get to the combined catalog `/project/chihway/data/decade/metacal_gold_combined_20231212.hdf`. This file is close to what we want eventually, except that we do not have fitvd quantities.
