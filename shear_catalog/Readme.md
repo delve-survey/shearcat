@@ -2,19 +2,58 @@
 
 ## 2024-02-09
 
-* We combined all the tile lists into a single one using the script: , the final list is here.
+* We combined all the tile lists into a single one using the script: https://github.com/delve-survey/shearcat/blob/main/Tilelist/final_02092024/reformat_final.py, the final list is here: https://github.com/delve-survey/shearcat/blob/main/Tilelist/final_02092024/Tilelist_final_DR3_1.csv.
   
-* Metacal was run previously with separate batches, see log file 2023-12-12  
+* Metacal was run previously with separate batches, see log file 2023-12-12. All the files are now together in this directory: `/project/chihway/data/decade/shearcat_final`.  
 
 * Download SE catalogs:
 
   ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/mastercat
+  python QueryGold_final.py
+  ```
+* Make joint masks and matching metacal and SE catalogs:
+
+  ```
   cd /project/chihway/chihway/shearcat/shear_catalog/notebook
-  python QueryGold_v2.py
-  cd /project/chihway/chihway/shearcat/shear_catalog/measurement
-  gold_cuts_v2.sh
+  submit_CombineGoldMetacal.sh 
   ```
 
+* Combine column-by-column, then merge to form one giant file:
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks/combine_column_20231212
+  submit_CombineGoldMetacal_cols.sh
+  python CombineGoldMetacal_final_merge.py
+  ```
+
+* Add foreground, extinction-corrected flux, s/g flag to final catalog:
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
+  python CombineGoldMetacal_additional_columns.py X
+  # X above can be sg, foreground, dered
+  ```
+  
+* Get grid of response and sigmae to for weights:
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/response_s2n_size
+  submit_calculate_response_size_s2n.sh
+  ```
+  
+* Add weights to final catalog:
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
+  python CombineGoldMetacal_additional_columns.py weights
+  ```
+* Make mask for metacal cuts on catalog, this outputs file to `/project/chihway/data/decade/metacal_gold_combined_mask_20231212.hdf`, which we may want to just add to the master catalog after combining with tomographic information
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
+  python MakeMcalMask.py
+  ```
 
 
 ## 2023-12-12
