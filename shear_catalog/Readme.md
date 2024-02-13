@@ -8,7 +8,7 @@ This is the instructions to get to the file `/project/chihway/data/decade/metaca
   
 * Metacal was run previously with separate batches, see log file 2023-12-12. All the files are now together in this directory: `/project/chihway/data/decade/shearcat_final`.  
 
-* Download SE catalogs:
+* Download SE catalogs. They will all sit in this directory: `/project/chihway/data/decade/coaddcat_final`:
 
   ```
   cd /project/chihway/chihway/shearcat/shear_catalog/mastercat
