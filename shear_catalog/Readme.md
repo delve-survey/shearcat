@@ -4,7 +4,12 @@
 
 This is the instructions to get to the file `/project/chihway/data/decade/metacal_gold_combined_mask_20240209.hdf`.
 
-* We combined all the tile lists into a single one using the script: https://github.com/delve-survey/shearcat/blob/main/Tilelist/final_20240209/reformat_final.py, the final list is here: https://github.com/delve-survey/shearcat/blob/main/Tilelist/final_20240209/Tilelist_final_DR3_1.csv.
+* We combined all the tile lists into a single one using
+  ```
+  cd /project/chihway/chihway/shearcat/Tilelist/final_20240209
+  python reformat_final.py
+  ```
+  The final list is here: https://github.com/delve-survey/shearcat/blob/main/Tilelist/final_20240209/Tilelist_final_DR3_1.csv.
   
 * Metacal was run previously with separate batches, see log file 2023-12-12. All the files are now together in this directory: `/project/chihway/data/decade/shearcat_final`.  
 
