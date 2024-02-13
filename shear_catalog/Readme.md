@@ -64,7 +64,7 @@ This is the instructions to get to the file `/project/chihway/data/decade/metaca
 
   ```
   cd /project/chihway/chihway/shearcat/shear_catalog/mastercat
-  python MakeMcalMask.py
+  python MakeMcalMask_tomo.py
   ```
 
 ## 2023-12-12
