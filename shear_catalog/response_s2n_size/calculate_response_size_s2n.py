@@ -1,5 +1,4 @@
 
-
 import sys
 sys.path.append('.conda/envs/shear/lib/python3.9/site-packages/')
 
@@ -9,7 +8,7 @@ import h5py
 import healpy as hp
 import scipy
 
-tag = '1212'
+tag = '20240209'
 
 size_ratio_grid = np.logspace(np.log10(0.5), np.log10(6), 21)
 s2n_grid = np.logspace(np.log10(10), np.log10(400), 21)
@@ -20,8 +19,8 @@ def mcal_mask(size_min, size_max, s2n_min, s2n_max):
     for shear_type in ['noshear', '1p', '1m', '2p', '2m']:
         print(shear_type)
         
-        with h5py.File('/project/chihway/data/decade/metacal_gold_combined_2023'+tag+'.hdf', 'r') as h5r:
-            flux_r, flux_i, flux_z = h5r['mcal_flux_'+shear_type+'_dered'][:].T
+        with h5py.File('/project/chihway/data/decade/metacal_gold_combined_'+tag+'.hdf', 'r') as h5r:
+            flux_r, flux_i, flux_z = h5r['mcal_flux_'+shear_type+'_dered_sfd98'][:].T
 
         mag_r = -2.5*np.log10(flux_r)+30
         mag_i = -2.5*np.log10(flux_i)+30
@@ -36,7 +35,7 @@ def mcal_mask(size_min, size_max, s2n_min, s2n_max):
 
         del mag_i, mag_z, flux_r, flux_i, flux_z
 
-        with h5py.File('/project/chihway/data/decade/metacal_gold_combined_2023'+tag+'.hdf', 'r') as h5r:
+        with h5py.File('/project/chihway/data/decade/metacal_gold_combined_'+tag+'.hdf', 'r') as h5r:
             T = h5r['mcal_T_'+shear_type][:]
             s2n = h5r['mcal_s2n_'+shear_type][:]
             size_ratio = h5r['mcal_T_ratio_'+shear_type][:]
@@ -53,11 +52,9 @@ def mcal_mask(size_min, size_max, s2n_min, s2n_max):
 
         del T, s2n, size_ratio, mag_r, mcal_flags
 
-        with h5py.File('/project/chihway/data/decade/metacal_gold_combined_2023'+tag+'.hdf', 'r') as h5r:
+        with h5py.File('/project/chihway/data/decade/metacal_gold_combined_'+tag+'.hdf', 'r') as h5r:
             
-            sg = h5r['id'][:]*0.0+4
-            # hack before we get proper sg cuts
-            
+            sg = h5r['FLAGS_SG_BDF'][:]
             fg = h5r['FLAGS_FOREGROUND'][:]
 
         SG_Mask = (sg>=4)
@@ -81,14 +78,14 @@ j = int(sys.argv[2])
 print(i,j)
 Mask_mcal = mcal_mask(size_ratio_grid[i], size_ratio_grid[i+1], s2n_grid[j], s2n_grid[j+1])
 
-with h5py.File('/project/chihway/data/decade/metacal_gold_combined_2023'+tag+'.hdf', 'r') as h5r:
+with h5py.File('/project/chihway/data/decade/metacal_gold_combined_'+tag+'.hdf', 'r') as h5r:
     R11 =  (np.mean(h5r['mcal_g_1p'][:,0][Mask_mcal['noshear']]) - np.mean(h5r['mcal_g_1m'][:,0][Mask_mcal['noshear']]))/dgamma
     R11s = (np.mean(h5r['mcal_g_noshear'][:,0][Mask_mcal['1p']]) - np.mean(h5r['mcal_g_noshear'][:,0][Mask_mcal['1m']]))/dgamma
     R22 =  (np.mean(h5r['mcal_g_2p'][:,1][Mask_mcal['noshear']]) - np.mean(h5r['mcal_g_2m'][:,1][Mask_mcal['noshear']]))/dgamma
     R22s = (np.mean(h5r['mcal_g_noshear'][:,1][Mask_mcal['2p']]) - np.mean(h5r['mcal_g_noshear'][:,1][Mask_mcal['2m']]))/dgamma
     print(R11, R11s, R22, R22s)
     
-with h5py.File('/project/chihway/data/decade/metacal_gold_combined_2023'+tag+'.hdf', 'r') as h5r:
+with h5py.File('/project/chihway/data/decade/metacal_gold_combined_'+tag+'.hdf', 'r') as h5r:
     print(Mask_mcal['noshear'])
 
     g1, g2  = h5r['mcal_g_noshear'][:][Mask_mcal['noshear']].T
