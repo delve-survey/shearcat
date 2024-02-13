@@ -2,6 +2,8 @@
 
 ## 2024-02-09
 
+This is the instructions to get to the file `/project/chihway/data/decade/metacal_gold_combined_mask_20240209.hdf`.
+
 * We combined all the tile lists into a single one using the script: https://github.com/delve-survey/shearcat/blob/main/Tilelist/final_20240209/reformat_final.py, the final list is here: https://github.com/delve-survey/shearcat/blob/main/Tilelist/final_20240209/Tilelist_final_DR3_1.csv.
   
 * Metacal was run previously with separate batches, see log file 2023-12-12. All the files are now together in this directory: `/project/chihway/data/decade/shearcat_final`.  
@@ -30,9 +32,10 @@
 * Add foreground, extinction-corrected flux, s/g flag to final catalog:
 
   ```
-  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
-  python CombineGoldMetacal_additional_columns.py X
-  # X above can be sg, foreground, dered
+  cd /project/chihway/chihway/shearcat/shear_catalog/mastercat
+  python CombineGoldMetacal_additional_columns.py 'sg'
+  python CombineGoldMetacal_additional_columns.py 'foreground'
+  python CombineGoldMetacal_additional_columns.py 'dered'
   ```
   
 * Get grid of response and sigmae to for weights:
@@ -45,16 +48,24 @@
 * Add weights to final catalog:
 
   ```
-  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
+  cd /project/chihway/chihway/shearcat/shear_catalog/mastercat
   python CombineGoldMetacal_additional_columns.py weights
   ```
-* Make mask for metacal cuts on catalog, this outputs file to `/project/chihway/data/decade/metacal_gold_combined_mask_20231212.hdf`, which we may want to just add to the master catalog after combining with tomographic information
+
+* Make mask for metacal cuts on catalog, without tomographic information. This outputs file to `/project/chihway/data/decade/metacal_gold_combined_mask_20240209.hdf`
 
   ```
-  cd /project/chihway/chihway/shearcat/shear_catalog/notebooks
+  cd /project/chihway/chihway/shearcat/shear_catalog/mastercat
+  python MakeMcalMask_notomo.py
+  ```
+* Pass the h5 file at this state to photo-z to get tomographic binning.
+
+* Make final mask that includes tomographic information and merge back to the main h5 file.
+
+  ```
+  cd /project/chihway/chihway/shearcat/shear_catalog/mastercat
   python MakeMcalMask.py
   ```
-
 
 ## 2023-12-12
 
