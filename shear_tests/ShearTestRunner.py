@@ -41,6 +41,7 @@ class AllTests(object):
         self.galaxy_cat_inds = np.load(galaxy_cat_inds)
 
         self.Npatch = 100
+        self.Star_SNR_min = 40
 
         self.psf_inds, self.gal_inds = self.define_patches()
 
@@ -56,14 +57,6 @@ class AllTests(object):
     def define_patches(self):
 
         
-        with h5py.File(self.psf_cat, 'r') as f:
-            RA, DEC = f['ra'][:][self.psf_cat_inds], f['dec'][:][self.psf_cat_inds]
-
-        S = int(RA.size/5_000_000)
-        centers  = treecorr.Catalog(ra = RA[::S], dec = DEC[::S], ra_units='deg',dec_units='deg', npatch = self.Npatch)._centers
-        psf_inds = treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', patch_centers = centers)._patch
-
-        
         with h5py.File(self.galaxy_cat, 'r') as f:
             RA, DEC = f['RA'][:][self.galaxy_cat_inds], f['DEC'][:][self.galaxy_cat_inds]
 
@@ -71,7 +64,12 @@ class AllTests(object):
         centers  = treecorr.Catalog(ra = RA[::S], dec = DEC[::S], ra_units='deg',dec_units='deg', npatch = self.Npatch)._centers
         gal_inds = treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', patch_centers = centers)._patch
         
+        
+        with h5py.File(self.psf_cat, 'r') as f:
+            RA, DEC = f['ra'][:][self.psf_cat_inds], f['dec'][:][self.psf_cat_inds]
 
+        psf_inds = treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', patch_centers = centers)._patch
+        
         return psf_inds, gal_inds
 
 
@@ -92,9 +90,11 @@ class AllTests(object):
             e2_model = f['g2_model_hsm'][:][self.psf_cat_inds]
             e1_star  = f['g1_star_hsm'][:][self.psf_cat_inds]
             e2_star  = f['g2_star_hsm'][:][self.psf_cat_inds]
-            s2n      = (f['FLUX_APER_8'][:]/f['FLUXERR_APER_8'][:])[self.psf_cat_inds]
+            s2n      = (f['FLUX_APER_8'][:]/f['FLUXERR_APER_8'][:])[self.psf_cat_inds]          
+            band     = np.array(f['BAND'][:]).astype('U1')[self.psf_cat_inds]
+            
 
-            mask = (s2n > 40)
+            mask = (s2n > self.Star_SNR_min) & (band != 'g')
 
         dT      = (T_star-T_model)[mask]
         dT_frac = ((T_star-T_model)/T_star)[mask]
@@ -160,10 +160,10 @@ class AllTests(object):
                 T       = f[f'mcal_T_{label}'][:][self.galaxy_cat_inds]
                 flags   = f['mcal_flags'][:][self.galaxy_cat_inds]
                 
-#                 if 'sg_bdf' in f.keys():
-#                     sg_bdf  = f['sg_bdf'][:][self.galaxy_cat_inds]
-#                 else:
-#                     sg_bdf  = np.ones_like(T) * 99
+                if 'sg_bdf' in f.keys():
+                    sg_bdf  = f['sg_bdf'][:][self.galaxy_cat_inds]
+                else:
+                    sg_bdf  = np.ones_like(T) * 99
 
                 print("FORCING SG BDF TO PASS EVERYWHERE")
                 sg_bdf  = np.ones_like(T) * 99
@@ -634,7 +634,7 @@ class AllTests(object):
 
 
                 No_Gband  = band != 'g' #We don't use g-band in shear
-                SNR_Mask  = SNR > 40
+                SNR_Mask  = SNR > self.Star_SNR_min
                 Mag_Mask  = (mag > m_range[0]) & (mag < m_range[1])
 
                 print(np.sum(No_Gband), np.sum(SNR_Mask), np.sum(Mag_Mask))
@@ -729,14 +729,14 @@ class AllTests(object):
         g1, g2 = g1/R11, g2/R22
 
         #Need a -1 for g2 due to Namaster definition
-#         T = treecorr.Catalog(g1 = g1[::], g2 = g2[::], ra = ra[::], dec = dec[::], w = w[::], ra_units='deg',dec_units='deg', npatch = self.Npatch)
+        T = treecorr.Catalog(g1 = g1[::], g2 = g2[::], ra = ra[::], dec = dec[::], w = w[::], ra_units='deg',dec_units='deg', npatch = self.Npatch)
         R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = -g2, w = w, NSIDE = nside); del ra, dec, g1, g2
         C = self.MakeMapFromCls(self.sim_Cls, NSIDE = nside)
         
         #Process regular Bmodes
         X    = self.BmodeRunner(R, C, 42, njobs = 1)
         data = X.process_data()
-        Cov  = X.process_noise(500) #Make a lot more sims so we dont get hit by Hartlap factor
+        Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
 
         np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
         np.save(self.output_path + '/Bmode_Noise.npy', Cov)
@@ -745,14 +745,14 @@ class AllTests(object):
         #Process pure Bmodes
         X    = self.PureBmodeRunner(R, C, 42, njobs = 1)
         data = X.process_data()
-        Cov  = X.process_noise(500) #Make a lot more sims so we dont get hit by Hartlap factor
+        Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
 
         np.save(self.output_path + '/PureBmode.npy', np.vstack([data,  X.ell_eff]))
         np.save(self.output_path + '/PureBmode_Noise.npy', Cov)
         
         
         #Process Matt's real-space E/B estimator
-        X = self.MRBmodeRunner(T, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 40)
+        X = self.MRBmodeRunner(T, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_treecorr.txt'))
         np.save(self.output_path + '/MRBmode_E.npy', E)
@@ -805,7 +805,7 @@ class AllTests(object):
             SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
             
             No_Gband  = band != 'g' #We don't use g-band in shear
-            SNR_Mask  = SNR > 40
+            SNR_Mask  = SNR > self.Star_SNR_min
 
             print(np.sum(No_Gband), np.sum(SNR_Mask))
             Mask = SNR_Mask & No_Gband
@@ -933,6 +933,24 @@ class AllTests(object):
     @timeit
     def MRBmode_psf(self):
         
+        Mask = self.get_mcal_Mask('noshear')
+
+        #Load the shape catalog
+        with h5py.File(self.galaxy_cat, 'r') as f:
+
+            gal_ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            gal_dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            gal_g1, gal_g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
+
+            #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
+            for a in [gal_g1, gal_g2]:
+                a -= np.average(a, weights = gal_w)
+
+        R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
+        gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
+        
+        
         with h5py.File(self.psf_cat, 'r') as f:
         
             psf_ra   = f['ra'][:][self.psf_cat_inds]
@@ -956,7 +974,7 @@ class AllTests(object):
             SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
             
             No_Gband  = band != 'g' #We don't use g-band in shear
-            SNR_Mask  = SNR > 40
+            SNR_Mask  = SNR > self.Star_SNR_min
 
             print(np.sum(No_Gband), np.sum(SNR_Mask))
             Mask = SNR_Mask & No_Gband
@@ -1005,9 +1023,9 @@ class AllTests(object):
             os.system('rm %s' % os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp')
         
         center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
-        Nth    = int(len(psf_ra)/20_000_000) #Select every Nth object such that we end up using 20 million to define patches
+        Nth    = int(len(gal_g1)/20_000_000) #Select every Nth object such that we end up using 20 million to define patches
         if Nth < 1: Nth = 1
-        small_cat = treecorr.Catalog(ra=psf_ra[::Nth], dec=psf_dec[::Nth],  ra_units='deg', dec_units='deg', npatch = self.Npatch)
+        small_cat = treecorr.Catalog(ra=gal_ra[::Nth], dec=gal_dec[::Nth], ra_units='deg', dec_units='deg', npatch = self.Npatch)
         small_cat.write_patch_centers(center_path)
         del small_cat
                           
@@ -1180,7 +1198,7 @@ class AllTests(object):
             #NOW AVERAGE ACROSS FOOTPRINTS
             ########################################################################################################################
             
-            for SNR_threshold in [20, 40, 60, 80]:
+            for SNR_threshold in [1, 20, 40, 60, 80]:
                 
                 print("\n--------------------------------------------------------------")
                 print("--------------------------------------------------------------")
@@ -1208,7 +1226,7 @@ class AllTests(object):
             #GET QUANTITIES FOR  COLOR DEP.
             ########################################################################################################################
                 
-            Mask = (psf_w > 0) & (SNR > 40) & (BAND != 'g')
+            Mask = (psf_w > 0) & (SNR > self.Star_SNR_min) & (BAND != 'g')
             
             del psf_ra, psf_dec, SNR, weight_map, gal_ra, gal_dec, BAND
             
