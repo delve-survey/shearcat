@@ -41,7 +41,7 @@ class AllTests(object):
         self.galaxy_cat_inds = np.load(galaxy_cat_inds)
 
         self.Npatch = 100
-        self.Star_SNR_min = 40
+        self.Star_SNR_min = 80
 
         self.psf_inds, self.gal_inds = self.define_patches()
 
@@ -473,7 +473,8 @@ class AllTests(object):
 
 
         #First load the field centers
-        fcenters = pd.read_csv('/project/chihway/dhayaa/DECADE/FieldCenters_20231016.csv')
+        fcenters = pd.read_csv('/project/chihway/dhayaa/DECADE/FieldCenters_DR3_1_20240305.csv')
+        fcenters = fcenters.drop_duplicates()
         fc_ra  = np.array(fcenters['RADEG'])
         fc_dec = np.array(fcenters['DECDEG'])
         
@@ -511,8 +512,6 @@ class AllTests(object):
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
         
-        print(R11, R22)
-
         center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
 
         Nth    = int(len(gal_ra)/10_000_000) #Select every Nth object such that we end up using 10 million to define patches
@@ -526,7 +525,7 @@ class AllTests(object):
         phi   = np.random.uniform(0, 2*np.pi, N_randoms)
         theta = np.arccos(1 - 2*np.random.uniform(0, 1, N_randoms))
 
-        NSIDE = 1024
+        NSIDE = 256
         # Remove points that aren't within the galaxy Mask
         hpix = hp.ang2pix(NSIDE, gal_ra, gal_dec, lonlat  = True)
         Ngal = np.bincount(hpix, minlength = hp.nside2npix(NSIDE))
@@ -563,17 +562,20 @@ class AllTests(object):
         
         #Compute the rowe stats
         NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250,
-                                    sep_units = 'arcmin',verbose = 0, bin_slop = 0.0, var_method='jackknife')
+                                    sep_units = 'arcmin',verbose = 0, bin_slop = 0.01, var_method='jackknife')
         
         NG.process(cat_t, cat_g, low_mem=True)
         NG.write(os.path.join(self.output_path, 'fieldcenter_treecorr.txt'))
-        cov_jk = NG.estimate_cov('jackknife')
+        cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
         np.savetxt(os.path.join(self.output_path, 'fieldcenter_cov_treecorr.txt'), cov_jk)
         
         print("FINISHED true_shear")
 
+        
         NG.process(cat_r, cat_g, low_mem=True)
         NG.write(os.path.join(self.output_path, 'fieldcenter_rands_treecorr.txt'))
+        cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
+        np.savetxt(os.path.join(self.output_path, 'fieldcenter_rands_cov_treecorr.txt'), cov_jk)
         
         print("FINISHED rand_shear")
 
@@ -697,11 +699,14 @@ class AllTests(object):
 
             NG.process(cat_s, cat_g, low_mem=True)
             NG.write(os.path.join(self.output_path, 'starshears_%s_treecorr.txt' % m_name))
-            cov_jk = NG.estimate_cov('jackknife')
+            cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
             np.savetxt(os.path.join(self.output_path, 'starshears_%s_cov_treecorr.txt' % m_name), cov_jk)
 
             NG.process(cat_r, cat_g, low_mem=True)
             NG.write(os.path.join(self.output_path, 'starshears_%s_rands_treecorr.txt' % m_name))
+            cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
+            np.savetxt(os.path.join(self.output_path, 'starshears_%s_rands_cov_treecorr.txt' % m_name), cov_jk)
+            
             
     @timeit
     def Bmodes(self):
