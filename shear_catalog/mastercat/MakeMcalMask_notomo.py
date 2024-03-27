@@ -40,14 +40,17 @@ def get_mcal_mask(sr, sn, t, mf, s1, s2, mr):
 
     return mcal_mask
 
-def get_sgfg_mask(sgf, fgf):
+def get_sgfgftbc_mask(sgf, fgf, ftf, bcf):
 
-    SG_Mask = (sgf>=4)
+    # SG mask not used here!
     FG_Mask = (fgf==0)
-    sgfg_mask = SG_Mask & FG_Mask
-    del SG_Mask, FG_Mask
+    FT_Mask = (ftf==0)
+    BC_Mask = (bcf==0)
 
-    return sgfg_mask
+    sgfgftbc_mask = FG_Mask & FT_Mask & BC_Mask
+    del FG_Mask, FT_Mask, BC_Mask
+
+    return sgfgftbc_mask
 
 def get_baseline_mcal_mask():
 
@@ -82,13 +85,15 @@ def get_baseline_mcal_mask():
             # this is a hack because we don't have fitvd
             sg = h5r['FLAGS_SG_BDF'][:]
             fg = h5r['FLAGS_FOREGROUND'][:]
+            ft = h5r['FLAGS_FOOTPRINT'][:]
+            bc = h5r['FLAGS_BAD_COLOR'][:]
 
         # s/g and foreground mask
-        sgfg_mask = get_sgfg_mask(sg, fg)
-        del sg, fg
+        sgfgftbc_mask = get_sgfgftbc_mask(sg, fg, ft, bc)
+        del sg, fg, ft, bc
 
-        mask_total_X = mcal_pz_mask & mcal_mask & sgfg_mask
-        del mcal_pz_mask, mcal_mask, sgfg_mask
+        mask_total_X = mcal_pz_mask & mcal_mask & sgfgftbc_mask
+        del mcal_pz_mask, mcal_mask, sgfgftbc_mask
 
         print('got mask for '+shear_type)
         Mask[shear_type] = mask_total_X.astype('int')
@@ -111,39 +116,5 @@ with h5py.File(master_mask, 'w') as h5r:
     h5r.create_dataset('baseline_mcal_mask_1m', data = mask_total_X['1m'])
     h5r.create_dataset('baseline_mcal_mask_2p', data = mask_total_X['2p'])
     h5r.create_dataset('baseline_mcal_mask_2m', data = mask_total_X['2m'])
-
-
-
-# read in tomography catalogs
-RES = np.load('/project/chihway/raulteixeira/data/ID_MATCHED_DR3_1_20240123.npy')
-ids = RES[:,0]
-tomo = RES[:, 1] #Tomobins from Raul.
-tomo = tomo[ids>-1] + 1.
-on_mask = (mask_total_X['noshear']==1)
-mask_total_X['noshear'][on_mask] = tomo.copy()
-
-
-for shear_type in ['1p', '1m', '2p', '2m']:
-#    tomo_file = tomo_dir +'classify_sfd98_'+str(shear_type)+'/DR3_1_ID+TomoBin.hdf5'
-#    with h5py.File(tomo_file, 'r') as f:
-#        tomo = f['df/block0_values'][:][:,1]+1
-#        print(tomo)
-    print(shear_type)
-    RES = np.load('/project/chihway/raulteixeira/data/ID_MATCHED_'+str(shear_type)+'_DR3_1_20240123.npy')
-    ids = RES[:,0]
-    tomo = RES[:, 1] #Tomobins from Raul.
-    tomo = tomo[ids>-1] + 1.
-    on_mask = (mask_total_X[shear_type]==1)
-    mask_total_X[shear_type][on_mask] = tomo.copy()
-    print(mask_total_X[shear_type][on_mask])
-    print(tomo)
-
-with h5py.File(master_mask, 'w') as h5r:
-    h5r.create_dataset('baseline_mcal_mask_noshear', data = mask_total_X['noshear'])
-    h5r.create_dataset('baseline_mcal_mask_1p', data = mask_total_X['1p'])
-    h5r.create_dataset('baseline_mcal_mask_1m', data = mask_total_X['1m'])
-    h5r.create_dataset('baseline_mcal_mask_2p', data = mask_total_X['2p'])
-    h5r.create_dataset('baseline_mcal_mask_2m', data = mask_total_X['2m'])
-
 
 
