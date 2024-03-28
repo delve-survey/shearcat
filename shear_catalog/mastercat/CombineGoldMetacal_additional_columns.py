@@ -122,7 +122,7 @@ if operation == 'footprint':
         ra = h5r['RA'][:]
         dec = h5r['DEC'][:]
 
-    island = (dec > np.where(ra < 225, 30 - (30 - 13)/(225 - 200) * (ra - 200), 12.))
+    island = (dec > np.where(ra < 225, 30 - (30 - 12)/(225 - 200) * (ra - 200), 12.))
 
     with h5py.File(master_cat, 'a') as h5r:
         del h5r['FLAGS_FOOTPRINT']
