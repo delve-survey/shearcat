@@ -25,6 +25,9 @@ master_cat = project_dir+'metacal_gold_combined_'+tag+'.hdf'
 foreground_map = hp.read_map('/project/chihway/dhayaa/DECADE/Foreground_Masks/GOLD_Ext0.2_Star5.fits', dtype = int)
 nside_fg = 4096
 
+badcolor_map = hp.read_map('/project2/kadrlica/chinyi/DELVE_DR3_1_bad_colour_mask.fits', dtype = int)
+nside_badcolor = 4096
+
 response_dir = '/project/chihway/chihway/shearcat/shear_catalog/response_s2n_size/'
 
 ext_sfd = '/project/chihway/dhayaa/DECADE/Extinction_Maps/ebv_sfd98_nside_4096_ring_equatorial.fits'
@@ -83,6 +86,7 @@ if operation == 'sg':
     sg_bdf = extProduction(bdf_t, bdf_s2n)
 
     with h5py.File(master_cat, 'a') as h5r:
+        del h5r['FLAGS_SG_BDF']
         h5r.create_dataset('FLAGS_SG_BDF', data = sg_bdf)
 
     del bdf_s2n, bdf_t, size_ratio, s2n, sg_bdf
@@ -103,9 +107,51 @@ if operation == 'foreground':
     foreground = foreground_map[pix]
 
     with h5py.File(master_cat, 'a') as h5r:
+        del h5r['FLAGS_FOREGROUND']
         h5r.create_dataset('FLAGS_FOREGROUND', data = foreground)
 
     del ra, dec, theta, phi, pix, foreground
+
+#### footprint flag #############################################
+
+if operation == 'footprint':
+
+    print('Adding footprint flag...')
+
+    with h5py.File(master_cat, 'r') as h5r:
+        ra = h5r['RA'][:]
+        dec = h5r['DEC'][:]
+
+    island = (dec > np.where(ra < 225, 30 - (30 - 13)/(225 - 200) * (ra - 200), 12.))
+
+    with h5py.File(master_cat, 'a') as h5r:
+        del h5r['FLAGS_FOOTPRINT']
+        h5r.create_dataset('FLAGS_FOOTPRINT', data = island)
+
+    del ra, dec
+
+#### bad color flag ##########################################
+
+if operation == 'bad_color':
+
+    print('Adding bad color flag...')
+
+    with h5py.File(master_cat, 'r') as h5r:
+        ra = h5r['RA'][:]
+        dec = h5r['DEC'][:]
+
+    phi = ra/180*np.pi
+    theta = (90.-dec)/180*np.pi
+    pix = hp.ang2pix(nside_badcolor, theta, phi)
+    badcolor_map2 = badcolor_map.astype('bool')
+    badcolor = badcolor_map2[pix].astype('int')
+
+    with h5py.File(master_cat, 'a') as h5r:
+        del h5r['FLAGS_BAD_COLOR']
+        h5r.create_dataset('FLAGS_BAD_COLOR', data = badcolor)
+
+    del ra, dec, theta, phi, pix, badcolor
+
 
 #### shear weights #############################################
 # (already pre-calculated grid of response and shape noise) 
@@ -159,6 +205,7 @@ if operation == 'weights':
     # this might run slow, split it up?
 
     with h5py.File(master_cat, 'a') as h5r:
+        del h5r['mcal_g_w']
         h5r.create_dataset('mcal_g_w', data = weights)
 
     del size_ratio, s2n, weights
@@ -204,7 +251,7 @@ if operation == 'dered':
             arr[:, 2] *= 10**(Az/2.5)
 
             with h5py.File(master_cat, 'a') as h5r:
-
+                del h5r[c + '_dered_' + name.lower()]
                 h5r.create_dataset(c + '_dered_' + name.lower(), data = arr)
 
             del arr
@@ -227,11 +274,16 @@ if operation == 'dered':
 
             with h5py.File(master_cat, 'a') as h5r:
 
+                del h5r[c + '_DERED_' + name.upper()]
                 h5r.create_dataset(c + '_DERED_' + name.upper(), data = arr)
 
             del arr
 
         with h5py.File(master_cat, 'a') as h5r:
+            del h5r['Ag_' + name.lower()]
+            del h5r['Ar_' + name.lower()]
+            del h5r['Ai_' + name.lower()]
+            del h5r['Az_' + name.lower()]
             h5r.create_dataset('Ag_' + name.lower(), data = Ag)
             h5r.create_dataset('Ar_'+ name.lower(), data = Ar)
             h5r.create_dataset('Ai_'+ name.lower(), data = Ai)
