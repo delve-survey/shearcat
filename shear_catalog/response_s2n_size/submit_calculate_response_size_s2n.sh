@@ -5,14 +5,19 @@ do
 	
 for ((j=0;j<20;j++))
 do
+
+echo $i $j
+
 	
 if [ ! -f "/project/chihway/chihway/shearcat/shear_catalog/response_s2n_size/response_${i}_${j}.txt" ]
 then
 
+#python calculate_response_size_s2n.py ${i} ${j}
+
 echo "#!/bin/sh
 
 #SBATCH -t 00:30:00
-#SBATCH --partition=caslake
+#SBATCH --partition=amd
 #SBATCH --account=pi-chihway
 #SBATCH --job-name=response_${i}_${j}
 #SBATCH --exclusive

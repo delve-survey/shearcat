@@ -41,6 +41,8 @@ This is the instructions to get to the file `/project/chihway/data/decade/metaca
   python CombineGoldMetacal_additional_columns.py 'sg'
   python CombineGoldMetacal_additional_columns.py 'foreground'
   python CombineGoldMetacal_additional_columns.py 'dered'
+  python CombineGoldMetacal_additional_columns.py 'footprint'
+  python CombineGoldMetacal_additional_columns.py 'bad_color'
   ```
   
 * Get grid of response and sigmae to for weights:

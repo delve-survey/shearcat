@@ -54,18 +54,20 @@ def mcal_mask(size_min, size_max, s2n_min, s2n_max):
 
         with h5py.File('/project/chihway/data/decade/metacal_gold_combined_'+tag+'.hdf', 'r') as h5r:
             
-            sg = h5r['FLAGS_SG_BDF'][:]
             fg = h5r['FLAGS_FOREGROUND'][:]
+            footprint = h5r['FLAGS_FOOTPRINT'][:]
+            bad_color = h5r['FLAGS_BAD_COLOR'][:]
 
-        SG_Mask = (sg>=4)
         FG_Mask = (fg==0)
+        FT_Mask = (footprint==0)
+        BC_Mask = (bad_color==0)
 
-        mask_total_X = bin_Mask & mcal_pz_mask & SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Other_Mask & SG_Mask & FG_Mask
+        mask_total_X = bin_Mask & mcal_pz_mask & SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Other_Mask & FG_Mask & FT_Mask & BC_Mask
 
         Mask[shear_type] = mask_total_X
         
-        del sg, fg
-        del mask_total_X, bin_Mask, mcal_pz_mask, SNR_Mask, Tratio_Mask, T_Mask, Flag_Mask, Other_Mask, SG_Mask, FG_Mask
+        del fg, footprint, bad_color
+        del mask_total_X, bin_Mask, mcal_pz_mask, SNR_Mask, Tratio_Mask, T_Mask, Flag_Mask, Other_Mask, FG_Mask, FT_Mask, BC_Mask 
 
     return Mask
 
