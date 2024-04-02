@@ -32,7 +32,8 @@ class AllTests(object):
 
 
 
-    def __init__(self, psf_cat, galaxy_cat, psf_cat_inds, galaxy_cat_inds, output_path, sim_Cls_path):
+    def __init__(self, psf_cat, galaxy_cat, psf_cat_inds, galaxy_cat_inds, output_path, sim_Cls_path, 
+                 Npatch = 100, Star_SNR_min = 80, MapNSIDE_weightrands = 256):
         
         self.psf_cat    = psf_cat
         self.galaxy_cat = galaxy_cat
@@ -40,8 +41,9 @@ class AllTests(object):
         self.psf_cat_inds = np.load(psf_cat_inds)
         self.galaxy_cat_inds = np.load(galaxy_cat_inds)
 
-        self.Npatch = 100
-        self.Star_SNR_min = 80
+        self.Npatch = Npatch
+        self.Star_SNR_min = Star_SNR_min
+        self.MapNSIDE_weightrands = MapNSIDE_weightrands
 
         self.psf_inds, self.gal_inds = self.define_patches()
 
@@ -49,8 +51,8 @@ class AllTests(object):
 
         self.sim_Cls = np.loadtxt(sim_Cls_path) #Cls to use in making Gaussian mocks for covariance 
         
-#         self.dered = '_dered_sfd98'
-        self.dered = ''
+        self.dered = '_dered_sfd98'
+        #self.dered = ''
 
 
     @timeit
@@ -82,7 +84,7 @@ class AllTests(object):
         
         with h5py.File(self.psf_cat, 'r') as f:
 
-            flux     = f['FLUX_AUTO'][:][self.psf_cat_inds]
+            flux     = f['FLUX_AUTO_DERED_SFD98'][:][self.psf_cat_inds]
             T_model  = f['T_model_hsm'][:][self.psf_cat_inds]
             T_star   = f['T_star_hsm'][:][self.psf_cat_inds]
             mag_zp   = f['MAGZP'][:][self.psf_cat_inds]
@@ -90,11 +92,11 @@ class AllTests(object):
             e2_model = f['g2_model_hsm'][:][self.psf_cat_inds]
             e1_star  = f['g1_star_hsm'][:][self.psf_cat_inds]
             e2_star  = f['g2_star_hsm'][:][self.psf_cat_inds]
-            s2n      = (f['FLUX_APER_8'][:]/f['FLUXERR_APER_8'][:])[self.psf_cat_inds]          
-            band     = np.array(f['BAND'][:]).astype('U1')[self.psf_cat_inds]
+            s2n      = (f['FLUX_AUTO'][:]/f['FLUXERR_AUTO'][:])[self.psf_cat_inds]          
+            band     = f['BAND'][:][self.psf_cat_inds]
             
 
-            mask = (s2n > self.Star_SNR_min) & (band != 'g')
+            mask = (s2n > self.Star_SNR_min) & (band != b'g')
 
         dT      = (T_star-T_model)[mask]
         dT_frac = ((T_star-T_model)/T_star)[mask]
@@ -160,14 +162,6 @@ class AllTests(object):
                 T       = f[f'mcal_T_{label}'][:][self.galaxy_cat_inds]
                 flags   = f['mcal_flags'][:][self.galaxy_cat_inds]
                 
-                if 'sg_bdf' in f.keys():
-                    sg_bdf  = f['sg_bdf'][:][self.galaxy_cat_inds]
-                else:
-                    sg_bdf  = np.ones_like(T) * 99
-
-                print("FORCING SG BDF TO PASS EVERYWHERE")
-                sg_bdf  = np.ones_like(T) * 99
-
             # We don't use the gold cuts, as the expectations is to include them
             # in the indices that are passed in.
 
@@ -181,7 +175,6 @@ class AllTests(object):
                 T_Mask     = T < 10
                 Flag_Mask  = flags == 0
                 Other_Mask = np.invert((T > 2) & (SNR < 30)) & np.invert((np.log10(T) < (22.25 - mag_r)/3.5) & (e1**2 + e2**2 > 0.8**2))
-                SG_Mask    = sg_bdf >= 4 #Star-galaxy separator
                 Color_Mask = ((18 < mag_i) & (mag_i < 23.5) & 
                               (15 < mag_r) & (mag_r < 26) & 
                               (15 < mag_z) & (mag_z < 26) & 
@@ -189,13 +182,50 @@ class AllTests(object):
                               (-1.5 < mag_i - mag_z) & (mag_i - mag_z < 4)
                              )
 
-            Mask = SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Color_Mask & Other_Mask & SG_Mask
+            Mask = SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Color_Mask & Other_Mask
             
             np.save(os.environ['TMPDIR'] + '/MASK_%s.npy' % label, Mask)
 
             print("Loaded Mask")
         
         return Mask
+    
+    
+    @timeit
+    def get_star_Mask(self):
+    
+        dered = self.dered
+        label = 'noshear'
+        with h5py.File(self.galaxy_cat, 'r') as f:
+
+            #Normally needed for GOLD foreground cut but
+            #we don't do that here, so it's fine.
+            # ra      = f['RA'][:][self.galaxy_cat_inds]
+            # dec     = f['DEC'][:][self.galaxy_cat_inds]
+
+            SNR     = f[f'mcal_s2n_{label}'][:]
+            flags   = f['mcal_flags'][:]
+            sg_bdf  = f['FLAGS_SG_BDF'][:]
+
+        # We don't use the gold cuts, as the expectations is to include them
+        # in the indices that are passed in.
+
+        #GOLD_Foreground  = hp.read_map(fgpath, dtype = int)
+        #FLAGS_Foreground = GOLD_Foreground[hp.ang2pix(hp.npix2nside(GOLD_Foreground.size), ra, dec, lonlat = True)]
+
+        #Metacal cuts based on DES Y3 ones (from here: https://des.ncsa.illinois.edu/releases/y3a2/Y3key-catalogs)
+        with np.errstate(invalid = 'ignore', divide = 'ignore'):
+            SNR_Mask   = (SNR > 0) & (SNR < 1000)
+            Flag_Mask  = flags == 0
+            SG_Mask    = sg_bdf == 0 #Star-galaxy separator
+            
+        Mask = SNR_Mask & Flag_Mask & SG_Mask
+        
+        print("Loaded Mask")
+        
+        return Mask
+    
+    
     
     @timeit
     def compute_response(self, mask):
@@ -237,8 +267,8 @@ class AllTests(object):
 
         with h5py.File(self.galaxy_cat, 'r') as f:
 
-            mcal_g_w = f['mcal_g_w'][:][self.galaxy_cat_inds]
-            no_wgts  = np.ones_like(mcal_g_w)
+            mcal_g_w  = f['mcal_g_w'][:][self.galaxy_cat_inds]
+            no_wgts  = np.ones_like(mcal_g_w) #Need this for doing unweighted counts of objects later
             mcal_g_noshear = f['mcal_g_noshear'][:][self.galaxy_cat_inds]
             mcal_g_1p = f['mcal_g_1p'][:][self.galaxy_cat_inds]
             mcal_g_2p = f['mcal_g_2p'][:][self.galaxy_cat_inds]
@@ -376,27 +406,6 @@ class AllTests(object):
                 e2 = hist(A, mcal_g_noshear[:, 1] - mean_noshear[1], bin_edge, mcal_g_w, Mask0)
                 X  = hist(A, A, bin_edge, mcal_g_w, Mask0)
                 
-                
-#                 R11 = (mean(A, mcal_g_1p[:, 0], bin_edge, mcal_g_w, Mask0 & mask)
-#                      - mean(A, mcal_g_1m[:, 0], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
-
-#                 R11s = (mean(B, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1p & mask)
-#                      -  mean(C, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1m & mask))/dgamma
-
-#                 R11tot = R11 + R11s
-
-#                 R22 = (mean(A, mcal_g_2p[:, 1], bin_edge, mcal_g_w, Mask0 & mask)
-#                      - mean(A, mcal_g_2m[:, 1], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
-
-#                 R22s = (mean(D, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2p & mask)
-#                      -  mean(E, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2m & mask))/dgamma
-
-#                 R22tot = R22 + R22s
-
-#                 e1 = mean(A, mcal_g_noshear[:, 0] - mean_noshear[0], bin_edge, mcal_g_w, Mask0 & mask)/R11tot
-#                 e2 = mean(A, mcal_g_noshear[:, 1] - mean_noshear[1], bin_edge, mcal_g_w, Mask0 & mask)/R22tot
-#                 X  = mean(A, A, bin_edge, mcal_g_w, Mask0 & mask)
-
                 #Remove individual patches now
                 for j in tqdm(range(self.Npatch), desc = 'shear vs %s' % q):
 
@@ -438,32 +447,6 @@ class AllTests(object):
                     output[1, j] = e1_here/R_counts_here / R11_tot
                     output[2, j] = e2_here/R_counts_here / R22_tot
                     
-#                     mean_noshear = np.average(mcal_g_noshear[Mask0 & mask], weights = mcal_g_w[Mask0 & mask], axis = 0)
-                    
-#                     R11 = (mean(A, mcal_g_1p[:, 0], bin_edge, mcal_g_w, Mask0 & mask)
-#                          - mean(A, mcal_g_1m[:, 0], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
-
-#                     R11s = (mean(B, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1p & mask)
-#                          -  mean(C, mcal_g_noshear[:, 0], bin_edge, mcal_g_w, Mask1m & mask))/dgamma
-
-#                     R11tot = R11 + R11s
-                    
-#                     R22 = (mean(A, mcal_g_2p[:, 1], bin_edge, mcal_g_w, Mask0 & mask)
-#                          - mean(A, mcal_g_2m[:, 1], bin_edge, mcal_g_w, Mask0 & mask))/dgamma
-
-#                     R22s = (mean(D, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2p & mask)
-#                          -  mean(E, mcal_g_noshear[:, 1], bin_edge, mcal_g_w, Mask2m & mask))/dgamma
-
-#                     R22tot = R22 + R22s
-                    
-#                     e1 = mean(A, mcal_g_noshear[:, 0] - mean_noshear[0], bin_edge, mcal_g_w, Mask0 & mask)/R11tot
-#                     e2 = mean(A, mcal_g_noshear[:, 1] - mean_noshear[1], bin_edge, mcal_g_w, Mask0 & mask)/R22tot
-#                     X  = mean(A, A, bin_edge, mcal_g_w, Mask0 & mask)
-                    
-#                     output[0, j] = X
-#                     output[1, j] = e1
-#                     output[2, j] = e2
-
                 
             savepath = self.output_path + '/e_vs_%s.npy' % q
             np.save(savepath, output)
@@ -525,7 +508,7 @@ class AllTests(object):
         phi   = np.random.uniform(0, 2*np.pi, N_randoms)
         theta = np.arccos(1 - 2*np.random.uniform(0, 1, N_randoms))
 
-        NSIDE = 256
+        NSIDE = self.MapNSIDE_weightrands
         # Remove points that aren't within the galaxy Mask
         hpix = hp.ang2pix(NSIDE, gal_ra, gal_dec, lonlat  = True)
         Ngal = np.bincount(hpix, minlength = hp.nside2npix(NSIDE))
@@ -561,8 +544,8 @@ class AllTests(object):
         del rand_ra, rand_dec
         
         #Compute the rowe stats
-        NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250,
-                                    sep_units = 'arcmin',verbose = 0, bin_slop = 0.01, var_method='jackknife')
+        NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250, rng = np.random.default_rng(seed = 42),
+                                    sep_units = 'arcmin',verbose = 0, bin_slop = 0.1, var_method='jackknife')
         
         NG.process(cat_t, cat_g, low_mem=True)
         NG.write(os.path.join(self.output_path, 'fieldcenter_treecorr.txt'))
@@ -623,8 +606,9 @@ class AllTests(object):
         
         print("CALIBRATED/DONE")
             
-
+        
         for m_range, m_name in zip([[-1000, 16.5], [16.5, 10000]], ['bright', 'faint']):
+            
             with h5py.File(self.psf_cat, 'r') as f:
 
                 psf_ra   = f['ra'][:][self.psf_cat_inds]
@@ -632,7 +616,7 @@ class AllTests(object):
 
                 band = f['BAND'][:].astype('U1')[self.psf_cat_inds]
                 mag  = f['MAGZP'][:][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'][:])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
-                SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
+                SNR  = f['FLUX_AUTO'][:][self.psf_cat_inds]/f['FLUXERR_AUTO'][:][self.psf_cat_inds]
 
 
                 No_Gband  = band != 'g' #We don't use g-band in shear
@@ -651,7 +635,116 @@ class AllTests(object):
             print("LOADED EVERYTHING")
 
 
-            NSIDE      = 256
+            NSIDE      = self.MapNSIDE_weightrands
+            weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
+            pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
+            psf_w      = weight_map[pix] #Assign individual stars weights from the map
+
+            #Remove stars that are not in the galaxy sample's footprint
+            Mask     = psf_w > 0
+            psf_ra   = psf_ra[Mask]
+            psf_dec  = psf_dec[Mask]
+            psf_w    = psf_w[Mask]
+            del pix
+
+
+            #NOW MAKE A RANDOMS CATALOG
+            N_randoms = 1_000_000_000 #Doing rejection sampling so start with many more points than needed
+            phi   = np.random.uniform(0, 2*np.pi, N_randoms)
+            theta = np.arccos(1 - 2*np.random.uniform(0, 1, N_randoms))
+
+            # Remove points that aren't within the galaxy Mask
+            hpix = hp.ang2pix(NSIDE, theta, phi)
+            pix_mask   = weight_map[hpix] > 0
+            phi, theta = phi[pix_mask], theta[pix_mask]
+            rand_w     = weight_map[hpix][pix_mask]
+
+            #convert to RA and DEC
+            rand_ra  = phi*180/np.pi
+            rand_dec = 90 - theta*180/np.pi
+            center_path = os.environ['TMPDIR'] + '/Patch_centers_TreeCorr_tmp'
+
+            Nth    = int(len(gal_ra)/10_000_000) #Select every Nth object such that we end up using 10 million to define patches
+            if Nth < 1: Nth = 1
+            small_cat = treecorr.Catalog(ra=gal_ra[::Nth], dec=gal_dec[::Nth], ra_units='deg',dec_units='deg', npatch = self.Npatch)
+            small_cat.write_patch_centers(center_path)
+            del small_cat 
+
+            #DONT USE SAVE_PATCH_DIR. DOESN'T WORK WELL FOR WHAT WE NEED
+            cat_g = treecorr.Catalog(g1 = gal_g1, g2 = gal_g2, ra = gal_ra, dec = gal_dec, w = gal_w, ra_units='deg', dec_units='deg', patch_centers=center_path)
+            cat_s = treecorr.Catalog(ra = psf_ra,  dec = psf_dec, w = psf_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
+            cat_r = treecorr.Catalog(ra = rand_ra, dec = rand_dec, w = rand_w, ra_units='deg',dec_units='deg', patch_centers=center_path)
+
+            del rand_ra, rand_dec
+
+            #Compute the rowe stats
+            NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250, rng = np.random.default_rng(seed = 42),
+                                        sep_units = 'arcmin',verbose = 0, bin_slop = 0.1, var_method='jackknife')
+
+            NG.process(cat_s, cat_g, low_mem=True)
+            NG.write(os.path.join(self.output_path, 'coadd_starshears_%s_treecorr.txt' % m_name))
+            cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
+            np.savetxt(os.path.join(self.output_path, 'coadd_starshears_%s_cov_treecorr.txt' % m_name), cov_jk)
+
+            NG.process(cat_r, cat_g, low_mem=True)
+            NG.write(os.path.join(self.output_path, 'coadd_starshears_%s_rands_treecorr.txt' % m_name))
+            cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
+            np.savetxt(os.path.join(self.output_path, 'coadd_starshears_%s_rands_cov_treecorr.txt' % m_name), cov_jk)
+            
+    @timeit
+    def tangential_shear_coadd_stars(self):
+        
+
+        Mask = self.get_mcal_Mask('noshear')
+
+        #Load the shape catalog
+        with h5py.File(self.galaxy_cat, 'r') as f:
+
+            gal_ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            gal_dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            gal_w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
+            gal_g1, gal_g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
+
+            #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
+            for a in [gal_g1, gal_g2]:
+                a -= np.average(a, weights = gal_w)
+
+        R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
+        gal_g1, gal_g2 = gal_g1/R11, gal_g2/R22
+        
+        print("CALIBRATED/DONE")
+            
+        
+        for m_range, m_name in zip([[-1000, 16.5], [16.5, 10000]], ['bright', 'faint']):
+            
+            Mask = self.get_star_Mask()
+            
+            print(m_range,  np.sum(Mask),)
+            with h5py.File(self.galaxy_cat, 'r') as f:
+
+                #Calling this psf for historical reasons in the code.
+                #But these are actually coadd stars.
+                psf_ra   = f['RA'][:][Mask]
+                psf_dec  = f['DEC'][:][Mask]
+
+                mag  = 30 - 2.5*np.log10(f['mcal_flux_noshear'][:, 1])[Mask] # i-band magnitude
+                SNR  = f['mcal_s2n_noshear'][:][Mask]
+
+                SNR_Mask  = SNR > 10
+                Mag_Mask  = (mag > m_range[0]) & (mag < m_range[1])
+
+                Mask = SNR_Mask & Mag_Mask
+
+                print("TOTAL NUM", np.sum(Mask))
+                psf_ra   = psf_ra[Mask]
+                psf_dec  = psf_dec[Mask]
+
+                del Mask, SNR_Mask, Mag_Mask, mag, SNR
+
+            print("LOADED EVERYTHING")
+
+
+            NSIDE      = self.MapNSIDE_weightrands
             weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
             pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
             psf_w      = weight_map[pix] #Assign individual stars weights from the map
@@ -694,18 +787,18 @@ class AllTests(object):
             del rand_ra, rand_dec
 
             #Compute the rowe stats
-            NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250,
-                                        sep_units = 'arcmin',verbose = 0, bin_slop = 0.001, var_method='jackknife')
+            NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250, rng = np.random.default_rng(seed = 42),
+                                        sep_units = 'arcmin',verbose = 0, bin_slop = 0.1, var_method='jackknife')
 
             NG.process(cat_s, cat_g, low_mem=True)
-            NG.write(os.path.join(self.output_path, 'starshears_%s_treecorr.txt' % m_name))
+            NG.write(os.path.join(self.output_path, 'coadd_starshears_%s_treecorr.txt' % m_name))
             cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
-            np.savetxt(os.path.join(self.output_path, 'starshears_%s_cov_treecorr.txt' % m_name), cov_jk)
+            np.savetxt(os.path.join(self.output_path, 'coadd_starshears_%s_cov_treecorr.txt' % m_name), cov_jk)
 
             NG.process(cat_r, cat_g, low_mem=True)
-            NG.write(os.path.join(self.output_path, 'starshears_%s_rands_treecorr.txt' % m_name))
+            NG.write(os.path.join(self.output_path, 'coadd_starshears_%s_rands_treecorr.txt' % m_name))
             cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
-            np.savetxt(os.path.join(self.output_path, 'starshears_%s_rands_cov_treecorr.txt' % m_name), cov_jk)
+            np.savetxt(os.path.join(self.output_path, 'coadd_starshears_%s_rands_cov_treecorr.txt' % m_name), cov_jk)
             
             
     @timeit
@@ -805,11 +898,10 @@ class AllTests(object):
 
             del g1_star, g2_star
             
-            band = np.array(f['BAND'][:]).astype('U1')[self.psf_cat_inds]
-            mag  = f['MAGZP'][:][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'][:])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
-            SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
+            band = f['BAND'][:][self.psf_cat_inds]
+            SNR  = f['FLUX_AUTO'][:][self.psf_cat_inds]/f['FLUXERR_AUTO'][:][self.psf_cat_inds]
             
-            No_Gband  = band != 'g' #We don't use g-band in shear
+            No_Gband  = band != b'g' #We don't use g-band in shear
             SNR_Mask  = SNR > self.Star_SNR_min
 
             print(np.sum(No_Gband), np.sum(SNR_Mask))
@@ -825,11 +917,11 @@ class AllTests(object):
             w1  = w1[Mask]
             w2  = w2[Mask]
             
-            del Mask, SNR_Mask, No_Gband, band, mag, SNR
+            del Mask, SNR_Mask, No_Gband, band, SNR
         
         print("LOADED EVERYTHING")
 
-        NSIDE      = 256
+        NSIDE      = self.MapNSIDE_weightrands
         weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
         pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
         psf_w      = weight_map[pix] #Assign individual stars weights from the map
@@ -879,8 +971,8 @@ class AllTests(object):
         #Compute the shear 2pt
         ########################################################################################################################
 
-        GG = treecorr.GGCorrelation(nbins = 25, min_sep = 0.1, max_sep = 250,
-                                    sep_units = 'arcmin',verbose = 0,bin_slop = 0.01, var_method='jackknife')
+        GG = treecorr.GGCorrelation(nbins = 25, min_sep = 0.1, max_sep = 250, rng = np.random.default_rng(seed = 42),
+                                    sep_units = 'arcmin',verbose = 0,bin_slop = 0.1, var_method='jackknife')
         GG.process(cat_g, low_mem=True)
         GG.write(os.path.join(self.output_path, 'taustats_shear_2pt_treecorr.txt'))
 
@@ -974,11 +1066,10 @@ class AllTests(object):
 
             del g1_star, g2_star
             
-            band = np.array(f['BAND'][:]).astype('U1')[self.psf_cat_inds]
-            mag  = f['MAGZP'][:][self.psf_cat_inds] - 2.5*np.log10(f['FLUX_AUTO'][:])[self.psf_cat_inds] #Use this instead of MAG_AUTO so we use the better zeropoints
-            SNR  = f['FLUX_APER_8'][:][self.psf_cat_inds]/f['FLUXERR_APER_8'][:][self.psf_cat_inds]
+            band = f['BAND'][:][self.psf_cat_inds]
+            SNR  = f['FLUX_AUTO'][:][self.psf_cat_inds]/f['FLUXERR_AUTO'][:][self.psf_cat_inds]
             
-            No_Gband  = band != 'g' #We don't use g-band in shear
+            No_Gband  = band != b'g' #We don't use g-band in shear
             SNR_Mask  = SNR > self.Star_SNR_min
 
             print(np.sum(No_Gband), np.sum(SNR_Mask))
@@ -994,11 +1085,11 @@ class AllTests(object):
             w1  = w1[Mask]
             w2  = w2[Mask]
             
-            del Mask, SNR_Mask, No_Gband, band, mag, SNR
+            del Mask, SNR_Mask, No_Gband, band, SNR
         
         print("LOADED EVERYTHING")
 
-        NSIDE      = 256
+        NSIDE      = self.MapNSIDE_weightrands
         weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
         pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
         psf_w      = weight_map[pix] #Assign individual stars weights from the map
@@ -1111,11 +1202,11 @@ class AllTests(object):
             del hpix, unique_counts
             
             #Get selections for individual bands first
-            BAND  = f['BAND'][:].astype('U1')[self.psf_cat_inds]
-            Masks = [np.where(BAND == 'r')[0], np.where(BAND == 'i')[0], np.where(BAND == 'z')[0]]
+            BAND  = f['BAND'][:][self.psf_cat_inds]
+            Masks = [np.where(BAND == b'r')[0], np.where(BAND == b'i')[0], np.where(BAND == b'z')[0]]
             
-            flux = f['FLUX_AUTO'][:][self.psf_cat_inds]
-            SNR  = flux/f['FLUXERR_AUTO'][:][self.psf_cat_inds]
+            flux = f['FLUX_AUTO_DERED_SFD98'][:][self.psf_cat_inds]
+            SNR  = flux/f['FLUXERR_AUTO_DERED_SFD98'][:][self.psf_cat_inds]
             ZP   = f['MAGZP'][:][self.psf_cat_inds]
             mag  = ZP - 2.5 * np.log10(flux)
             
@@ -1171,9 +1262,11 @@ class AllTests(object):
 
             mcal_m_r, mcal_m_i, mcal_m_z = 30 - 2.5*np.log10(f[f'mcal_flux_noshear{dered}'][:][self.galaxy_cat_inds][Mask]).T
             
-            print("GAL r-z [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_z, [0.025, 0.5, 0.975]), 3))
-            print("GAL r-i [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_i, [0.025, 0.5, 0.975]), 3))
-            print("GAL i-z [95% bounds]", np.round(np.nanquantile(mcal_m_i - mcal_m_z, [0.025, 0.5, 0.975]), 3))
+            
+            with open(self.output_path + '/PSF_summaries.txt', 'a') as f:
+                print("GAL r-z [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_z, [0.025, 0.5, 0.975]), 3), file = f)
+                print("GAL r-i [95% bounds]", np.round(np.nanquantile(mcal_m_r - mcal_m_i, [0.025, 0.5, 0.975]), 3), file = f)
+                print("GAL i-z [95% bounds]", np.round(np.nanquantile(mcal_m_i - mcal_m_z, [0.025, 0.5, 0.975]), 3), file = f)
                 
         
     
@@ -1194,7 +1287,7 @@ class AllTests(object):
             #NOW COMPUTE STAR WEIGHTS
             ########################################################################################################################
 
-            NSIDE      = 256
+            NSIDE      = self.MapNSIDE_weightrands
             weight_map = self.star_weights_map(gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = NSIDE)
             pix        = hp.ang2pix(NSIDE, psf_ra, psf_dec, lonlat = True)
             psf_w      = weight_map[pix] #Assign individual stars weights from the map
@@ -1205,33 +1298,34 @@ class AllTests(object):
             
             for SNR_threshold in [1, 20, 40, 60, 80]:
                 
-                print("\n--------------------------------------------------------------")
-                print("--------------------------------------------------------------")
-                print("AVERAGE PSF QUANTITIES")
-                print("SNR = ", SNR_threshold)
-                print("--------------------------------------------------------------")
-                print("--------------------------------------------------------------")
-                
-                Mask = (psf_w > 0) & (SNR > SNR_threshold) & (BAND != 'g')
-                
-                print("<p> e1_psf:", np.average(ZE1[Mask], weights = psf_w[Mask]))
-                print("<p> e2_psf:", np.average(ZE2[Mask], weights = psf_w[Mask]))
+                with open(self.output_path + '/PSF_summaries.txt', 'a') as f:
+                    print("\n--------------------------------------------------------------", file = f)
+                    print("--------------------------------------------------------------", file = f)
+                    print("AVERAGE PSF QUANTITIES", file = f)
+                    print("SNR = ", SNR_threshold, file = f)
+                    print("--------------------------------------------------------------", file = f)
+                    print("--------------------------------------------------------------", file = f)
+
+                    Mask = (psf_w > 0) & (SNR > SNR_threshold) & (BAND != b'g')
+
+                    print("<p> e1_psf:", np.average(ZE1[Mask], weights = psf_w[Mask]), file = f)
+                    print("<p> e2_psf:", np.average(ZE2[Mask], weights = psf_w[Mask]), file = f)
 
 
-                print("<q> e1_err:", np.average(TH1[Mask], weights = psf_w[Mask]))
-                print("<q> e2_err:", np.average(TH2[Mask], weights = psf_w[Mask]))
+                    print("<q> e1_err:", np.average(TH1[Mask], weights = psf_w[Mask]), file = f)
+                    print("<q> e2_err:", np.average(TH2[Mask], weights = psf_w[Mask]), file = f)
 
 
-                print("<T> T_err:", np.average(TWO[Mask], weights = psf_w[Mask]))
-                print("sig(T) T_err:", np.sqrt(np.average(TWO[Mask]**2, weights = psf_w[Mask]) - 
-                                               np.average(TWO[Mask], weights = psf_w[Mask])**2))
+                    print("<T> T_err:", np.average(TWO[Mask], weights = psf_w[Mask]), file = f)
+                    print("sig(T) T_err:", np.sqrt(np.average(TWO[Mask]**2, weights = psf_w[Mask]) - 
+                                                   np.average(TWO[Mask], weights = psf_w[Mask])**2), file = f)
             
             
             ########################################################################################################################
             #GET QUANTITIES FOR  COLOR DEP.
             ########################################################################################################################
                 
-            Mask = (psf_w > 0) & (SNR > self.Star_SNR_min) & (BAND != 'g')
+            Mask = (psf_w > 0) & (SNR > self.Star_SNR_min) & (BAND != b'g')
             
             del psf_ra, psf_dec, SNR, weight_map, gal_ra, gal_dec, BAND
             
@@ -1263,9 +1357,9 @@ class AllTests(object):
                 counts_all = np.histogram(color, bins = bins)[0]
 
                 avg1_all = np.histogram(color, bins = bins, weights = ONE)[0]
-                avg2_all = np.histogram(color, bins = bins, weights = TWO * 1e2)[0]            
-                avg3_all = np.histogram(color, bins = bins, weights = TH1 * 1e3)[0]
-                avg4_all = np.histogram(color, bins = bins, weights = TH2 * 1e3)[0]
+                avg2_all = np.histogram(color, bins = bins, weights = TWO)[0]            
+                avg3_all = np.histogram(color, bins = bins, weights = TH1)[0]
+                avg4_all = np.histogram(color, bins = bins, weights = TH2)[0]
 
                 Avg_jack = []
                 for j in tqdm(range(self.Npatch), desc = 'color: %s' % colorname):
@@ -1275,9 +1369,9 @@ class AllTests(object):
                     counts = counts_all - np.histogram(color[patch_mask], bins = bins)[0]
 
                     avg1 = avg1_all - np.histogram(color[patch_mask], bins = bins, weights = ONE[patch_mask])[0]
-                    avg2 = avg2_all - np.histogram(color[patch_mask], bins = bins, weights = TWO[patch_mask] * 1e2)[0]            
-                    avg3 = avg3_all - np.histogram(color[patch_mask], bins = bins, weights = TH1[patch_mask] * 1e3)[0]
-                    avg4 = avg4_all - np.histogram(color[patch_mask], bins = bins, weights = TH2[patch_mask] * 1e3)[0]
+                    avg2 = avg2_all - np.histogram(color[patch_mask], bins = bins, weights = TWO[patch_mask])[0]            
+                    avg3 = avg3_all - np.histogram(color[patch_mask], bins = bins, weights = TH1[patch_mask])[0]
+                    avg4 = avg4_all - np.histogram(color[patch_mask], bins = bins, weights = TH2[patch_mask])[0]
                     
                     avg1 = avg1/counts
                     avg2 = avg2/counts
@@ -1565,7 +1659,8 @@ class AllTests(object):
         def compute_treecorr(self):
             
             Xi = treecorr.GGCorrelation(min_sep = self.theta_min, max_sep = self.theta_max, nbins = self.Ntheta,
-                                        sep_units = 'arcmin', var_method = 'jackknife', bin_slop = 0.01)
+                                        rng = np.random.default_rng(seed = 42),
+                                        sep_units = 'arcmin', var_method = 'jackknife', bin_slop = 0.1)
             
             if self.TreeCat2 is None:
                 Xi.process(self.TreeCat)
@@ -1591,13 +1686,14 @@ class AllTests(object):
                 beb = hybrideb.BinEB(self.theta_min, self.theta_max, self.Ntheta)
                 geb = hybrideb.GaussEB(beb, heb, Nl = self.Nmodes)
 
-                np.save(FILE, np.array([geb(i) for i in range(self.Nmodes)]))
-            
+                np.save(FILE, np.array([geb(i) for i in range(self.Nmodes)], dtype=object), allow_pickle = True)
+                
+                
         @timeit
         def compute_EB(self):
             
-            correlator = self.compute_treecorr()
             self.setup_kernel()
+            correlator = self.compute_treecorr()
             
             E = self._get_E([correlator])
             B = self._get_B([correlator])
@@ -1620,7 +1716,7 @@ class AllTests(object):
             
             for i in range(self.Nmodes):
                 
-                res = np.load(os.environ['TMPDIR'] + '/EB_Coefficients.npy', allow_pickle = True)[i]
+                res = np.load(os.environ['TMPDIR'] + '/EB_Coefficients.npy', allow_pickle = True)[()][i]
                 fp  = res[1]
                 fm  = res[2]
             
@@ -1651,11 +1747,17 @@ if __name__ == '__main__':
     my_parser.add_argument('--sim_Cls_path',    action='store', type = str, required = True)
     
     
+    my_parser.add_argument('--Npatch',       action='store', type = int, default = 150)
+    my_parser.add_argument('--Star_SNR_min', action='store', type = int, default = 80)
+    my_parser.add_argument('--MapNSIDE_weightrands', action='store', type = int, default = 256)
+    
+    
     my_parser.add_argument('--All',              action='store_true', default = False)
     my_parser.add_argument('--brighter_fatter',  action='store_true', default = False)
     my_parser.add_argument('--shear_vs_X',       action='store_true', default = False)
     my_parser.add_argument('--gt_field_centers', action='store_true', default = False)
     my_parser.add_argument('--gt_stars',         action='store_true', default = False)
+    my_parser.add_argument('--gt_coadd_stars',   action='store_true', default = False)
     my_parser.add_argument('--rho_stats',        action='store_true', default = False)
     my_parser.add_argument('--psf_color',        action='store_true', default = False)
     my_parser.add_argument('--Bmodes',           action='store_true', default = False)
@@ -1663,7 +1765,7 @@ if __name__ == '__main__':
     
     
     args  = vars(my_parser.parse_args())
-    cargs = {k:args[k] for k in list(args.keys())[:6]}
+    cargs = {k:args[k] for k in list(args.keys())[:9]}
     
     
     RUNNER = AllTests(**cargs)
@@ -1673,6 +1775,7 @@ if __name__ == '__main__':
     if np.logical_or(args['All'], args['shear_vs_X']):       RUNNER.shear_vs_X()
     if np.logical_or(args['All'], args['gt_field_centers']): RUNNER.tangential_shear_field_centers()
     if np.logical_or(args['All'], args['gt_stars']):         RUNNER.tangential_shear_stars()
+    if np.logical_or(args['All'], args['gt_coadd_stars']):   RUNNER.tangential_shear_coadd_stars()
     if np.logical_or(args['All'], args['rho_stats']):        RUNNER.rho_stats()
     if np.logical_or(args['All'], args['psf_color']):        RUNNER.psf_color()
     if np.logical_or(args['All'], args['Bmodes']):           RUNNER.Bmodes()
