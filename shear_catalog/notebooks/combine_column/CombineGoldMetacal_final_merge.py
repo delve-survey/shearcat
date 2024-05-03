@@ -14,7 +14,7 @@ import time
 print(time.ctime())
 
 path = '/project/chihway/data/decade/' 
-out_file = '/project/chihway/data/decade/metacal_gold_combined_20230919.hdf'
+out_file = '/project/chihway/data/decade/metacal_gold_combined_20231002.hdf'
 
 columns_mcal = ['badfrac', 'id',
            'mcal_T_1m', 'mcal_T_1p', 'mcal_T_2m', 'mcal_T_2p',

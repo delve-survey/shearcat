@@ -27,7 +27,8 @@ nside_fg = 4096
 
 response_dir = '/project/chihway/chihway/shearcat/shear_catalog/response_s2n_size/'
 
-extinction_map = hp.read_map('/project/chihway/dhayaa/DECADE/Imsim_Inputs/ebv_sfd98_fullres_nside_4096_ring_equatorial.fits')
+ext_sfd = '/project/chihway/dhayaa/DECADE/Extinction_Maps/ebv_sfd98_nside_4096_ring_equatorial.fits'
+ext_planck = '/project/chihway/dhayaa/DECADE/Extinction_Maps/ebv_planck13_nside_4096_ring_equatorial.fits'
 nside_ext = 4096
 
 ##################
@@ -154,7 +155,7 @@ if operation == 'weights':
 
     size_ratio = np.nan_to_num(size_ratio)
     s2n = np.nan_to_num(s2n)
-    weights = griddata(np.array([xx.flatten(),yy.flatten()]).T, ww.flatten(), (size_ratio, s2n), method='nearest')
+    weights = griddata(np.array([xx.flatten(),yy.flatten()]).T, w.flatten(), (size_ratio, s2n), method='nearest')
     # this might run slow, split it up?
 
     with h5py.File(master_cat, 'a') as h5r:
@@ -169,59 +170,74 @@ if operation == 'dered':
 
     print('Adding deredded fluxes...')
 
-    with h5py.File(master_cat, 'r') as h5r:
-
-        ra = h5r['RA'][:]
-        dec = h5r['DEC'][:]
-
-    R_SFD98    = extinction_map[hp.ang2pix(nside_ext, ra, dec, lonlat = True)]
-    Ag, Ar, Ai, Az = R_SFD98*3.186, R_SFD98*2.140, R_SFD98*1.569, R_SFD98*1.196
-
-    del ra, dec
-
-    #Metacal first
-    for c in ['mcal_flux_1m', 'mcal_flux_1p', 'mcal_flux_2m', 'mcal_flux_2p', 'mcal_flux_err_1m', 'mcal_flux_err_1p',
-              'mcal_flux_err_2m', 'mcal_flux_err_2p', 'mcal_flux_err_noshear', 'mcal_flux_noshear']:
-
-        print(c + '_dered')
+    for name in ['SFD98', 'Planck13']:
+        
         with h5py.File(master_cat, 'r') as h5r:
 
-            arr = h5r[c][:]
+            ra = h5r['RA'][:]
+            dec = h5r['DEC'][:]
+
+        if name == 'SFD98':
+            EXTINCTION = hp.read_map(ext_sfd)
+            R_SFD98    = EXTINCTION[hp.ang2pix(nside_ext, ra, dec, lonlat = True)]
+            Ag, Ar, Ai, Az = R_SFD98*3.186, R_SFD98*2.140, R_SFD98*1.569, R_SFD98*1.196
+
+            
+        elif name == 'Planck13':
+            EXTINCTION = hp.read_map(ext_planck)
+            R_PLK13    = EXTINCTION[hp.ang2pix(nside_ext, ra, dec, lonlat = True)]
+            Ag, Ar, Ai, Az = R_PLK13*4.085, R_PLK13*2.744, R_PLK13*2.012, R_PLK13*1.533
+       
+        del ra, dec
+
+        #Metacal first
+        for c in ['mcal_flux_1m', 'mcal_flux_1p', 'mcal_flux_2m', 'mcal_flux_2p', 'mcal_flux_err_1m', 'mcal_flux_err_1p',
+              'mcal_flux_err_2m', 'mcal_flux_err_2p', 'mcal_flux_err_noshear', 'mcal_flux_noshear']:
+
+            print(c + '_dered_'+ name.lower())
+            with h5py.File(master_cat, 'r') as h5r:
+
+                arr = h5r[c][:]
 
             arr[:, 0] *= 10**(Ar/2.5)
             arr[:, 1] *= 10**(Ai/2.5)
             arr[:, 2] *= 10**(Az/2.5)
 
-            h5r.create_dataset(c + '_dered', data = arr)
+            with h5py.File(master_cat, 'a') as h5r:
 
-        del arr
+                h5r.create_dataset(c + '_dered_' + name.lower(), data = arr)
+
+            del arr
    
 
-    for c in ['FLUX_AUTO_G', 'FLUX_AUTO_R', 'FLUX_AUTO_I', 'FLUX_AUTO_Z',
-            'FLUXERR_AUTO_G', 'FLUXERR_AUTO_R', 'FLUXERR_AUTO_I', 'FLUXERR_AUTO_Z']: 
-    #    ,   'BDF_FLUX_G', 'BDF_FLUX_R', 'BDF_FLUX_I', 'BDF_FLUX_Z',
-    #              'BDF_FLUX_ERR_G', 'BDF_FLUX_ERR_R', 'BDF_FLUX_ERR_I', 'BDF_FLUX_ERR_Z']:
+        for c in ['FLUX_AUTO_G', 'FLUX_AUTO_R', 'FLUX_AUTO_I', 'FLUX_AUTO_Z',
+                'FLUXERR_AUTO_G', 'FLUXERR_AUTO_R', 'FLUXERR_AUTO_I', 'FLUXERR_AUTO_Z']: 
+        #    ,   'BDF_FLUX_G', 'BDF_FLUX_R', 'BDF_FLUX_I', 'BDF_FLUX_Z',
+        #              'BDF_FLUX_ERR_G', 'BDF_FLUX_ERR_R', 'BDF_FLUX_ERR_I', 'BDF_FLUX_ERR_Z']:
 
-        print(c + '_DERED')
-        with h5py.File(master_cat, 'r') as h5r:
+            print(c + '_DERED_'+ name.upper())
+            with h5py.File(master_cat, 'r') as h5r:
 
-            arr = h5r[c][:]
+                arr = h5r[c][:]
 
             if c[-1] == 'G': arr *= 10**(Ag/2.5)
             elif c[-1] == 'R': arr *= 10**(Ar/2.5)
             elif c[-1] == 'I': arr *= 10**(Ai/2.5)
             elif c[-1] == 'Z': arr *= 10**(Az/2.5)
 
-            h5r.create_dataset(c + '_DERED', data = arr)
-        del arr
+            with h5py.File(master_cat, 'a') as h5r:
 
-    with h5py.File(master_cat, 'r') as h5r:
-        h5r.create_dataset('Ag', data = Ag)
-        h5r.create_dataset('Ar', data = Ar)
-        h5r.create_dataset('Ai', data = Ai)
-        h5r.create_dataset('Az', data = Az)
+                h5r.create_dataset(c + '_DERED_' + name.upper(), data = arr)
 
-    del Ag, Ar, Ai, Az
+            del arr
+
+        with h5py.File(master_cat, 'a') as h5r:
+            h5r.create_dataset('Ag_' + name.lower(), data = Ag)
+            h5r.create_dataset('Ar_'+ name.lower(), data = Ar)
+            h5r.create_dataset('Ai_'+ name.lower(), data = Ai)
+            h5r.create_dataset('Az_'+ name.lower(), data = Az)
+
+        del Ag, Ar, Ai, Az
 
 #####################################################################
 

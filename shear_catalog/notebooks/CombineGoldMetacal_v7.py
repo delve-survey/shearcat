@@ -1,4 +1,4 @@
-# this is the final script for DR3_1
+# this is the final script for DR3_1 (there are tiles that later needed to be rerun in here)
 
 import numpy as np
 import sys
