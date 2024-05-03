@@ -10,12 +10,11 @@ batch_id = int(sys.argv[1])
 meta_file = sys.argv[2]
 last_id = int(sys.argv[3])
 
-if last_id==6684:
+if last_id==10170 or last_id==6684:
     print("last batch")
 else: 
-    last_id = (batch_id+1)*100)
+    last_id = (batch_id+1)*100
 
-# metadata = np.genfromtxt('/project/chihway/chihway/shearcat/Tilelist/11072023/new_final_list_DR3_1_1.txt', dtype='str', delimiter=",")[1:]
 metadata = np.genfromtxt(meta_file, dtype='str', delimiter=",")[1:]
 
 
@@ -25,6 +24,7 @@ for i in range(batch_id*100,last_id): #len(metadata)): #change here to make shor
 
     pars_file = '/project/chihway/data/decade/coaddcat_pz/DELVE_gold_'+str(tile)+'.pars'
     h5_file = '/project/chihway/data/decade/coaddcat_pz/gold_'+str(tile)+'.h5'
+    npy_file = '/project/chihway/data/decade/coaddcat_pz/gold_'+str(tile)+'.chi2.npy'
     
     if os.path.isfile(h5_file):            
 
@@ -64,6 +64,7 @@ for i in range(batch_id*100,last_id): #len(metadata)): #change here to make shor
         sp.run(command, shell = True)
         sp.run(f'rm '+h5_file, shell = True)
         sp.run(f'rm '+pars_file, shell = True)
+        sp.run(f'rm '+npy_file, shell = True)
     else: print(tile+' empty tile')
 
 
