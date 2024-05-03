@@ -1,8 +1,13 @@
 #!/bin/bash
 
-meta=/project/chihway/chihway/shearcat/Tilelist/11072023/Tilelist_DR3_1_2_withASTROFIX.csv
+#meta=/project/chihway/chihway/shearcat/Tilelist/11072023/Tilelist_DR3_1_2_withASTROFIX.csv
+#meta=/project/chihway/chihway/shearcat/Tilelist/11072023/new_final_list_DR3_1_2.txt
+meta=/project/chihway/chihway/shearcat/Tilelist/07112023/new_final_list_DR3_1_2_without_rerun.txt
 
-for ((i=0;i<6000;i++)) 
+
+#for ((i=1352;i<4330;i++)) #10170
+
+for i in 2632
 
 do
 echo $i
@@ -12,7 +17,7 @@ tile=`more $meta |head -$j|tail -1|sed s/','/' '/|awk '{print $1}'`
 
 echo $tile
 
-if [ ! -f "/project/chihway/data/decade/shearcat_v3/metacal_output_${tile}.fits" ]
+if [ ! -f "/project/chihway/data/decade/shearcat_v3/metacal_output_${tile}.fits" ] || [ ! -f "/project/chihway/data/decade/shearcat_v3/ids_match_${tile}.npz" ]
 
 then
 
@@ -29,9 +34,10 @@ python download_tile.py ${i} ${meta}
 
 
 echo "#!/bin/sh
-#SBATCH -t 10:00:00
-#SBATCH --partition=caslake
-#SBATCH --account=pi-kadrlica
+#SBATCH -t 36:00:00
+#SBATCH --partition=amd
+##SBATCH --partition=broadwl
+#SBATCH --account=pi-chihway
 #SBATCH --job-name=metacal_${i}
 #SBATCH --exclusive
 #SBATCH --nodes=1
@@ -49,7 +55,10 @@ rm /scratch/midway3/chihway/delve_metacal/tile_${i}/*.csv
 
 ">submit
 
+# check file size
 sbatch submit
+#ls -l decade.ncsa.illinois.edu/deca_archive/DEC_Taiga/multiepoch/delve/r*/DES*/*/meds/*fz >size
+#rm decade.ncsa.illinois.edu/deca_archive/DEC_Taiga/multiepoch/delve/r*/DES*/*/meds/*fz
 
 else
 

@@ -1,8 +1,10 @@
 #!/bin/bash
 
-meta=/project/chihway/chihway/shearcat/Tilelist/11072023/Tilelist_DR3_1_1_withASTROFIX.csv
+#meta=/project/chihway/chihway/shearcat/Tilelist/11072023/Tilelist_DR3_1_1_withASTROFIX.csv
+meta=/project/chihway/chihway/shearcat/Tilelist/11072023/new_final_list_DR3_1_1.txt
 
-for ((i=700;i<6685;i++)) #6685
+
+for i in 550  #((i=0;i<6685;i++)) #6685
 
 do
 echo $i
@@ -12,9 +14,9 @@ tile=`more $meta |head -$j|tail -1|sed s/','/' '/|awk '{print $1}'`
 
 echo $tile
 
-if [ ! -f "/project/chihway/data/decade/shearcat_v2/metacal_output_${tile}.fits" ]
+#if [ ! -f "/project/chihway/data/decade/shearcat_v2/metacal_output_${tile}.fits" ] || [ ! -f "/project/chihway/data/decade/shearcat_v2/ids_match_${tile}.npz" ]
 
-then
+#then
 
 echo "file metacal_output_${tile}.fits does not exist!"
 
@@ -29,9 +31,10 @@ python download_tile.py ${i} ${meta}
 
 
 echo "#!/bin/sh
-#SBATCH -t 10:00:00
-#SBATCH --partition=caslake
-#SBATCH --account=pi-kadrlica
+#SBATCH -t 20:00:00
+#SBATCH --partition=amd
+##caslake
+#SBATCH --account=pi-jfrieman
 #SBATCH --job-name=metacal_${i}
 #SBATCH --exclusive
 #SBATCH --nodes=1
@@ -49,13 +52,14 @@ rm /scratch/midway3/chihway/delve_metacal/tile_${i}/*.csv
 
 ">submit
 
+# comment to just check the file size 
 sbatch submit
 
-else
+#else
 
 echo "file metacal_output_${tile}.fits exist!"
 
-fi
+#fi
 
 done
 

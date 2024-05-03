@@ -40,6 +40,12 @@ if os.path.isfile(dir_meds+tile+'_r6101'+p+'_r_meds-delve.fits.fz'):
             dir_meds+tile+'_r6101'+p+'_i_meds-delve.fits.fz',
             dir_meds+tile+'_r6101'+p+'_z_meds-delve.fits.fz']
 
+#DR3_1_1/2 new
+if os.path.isfile(dir_meds+tile+'_r6235'+p+'_r_meds-delve.fits.fz'):
+    filename = [dir_meds+tile+'_r6235'+p+'_r_meds-delve.fits.fz',
+            dir_meds+tile+'_r6235'+p+'_i_meds-delve.fits.fz',
+            dir_meds+tile+'_r6235'+p+'_z_meds-delve.fits.fz']
+
 #DR3_1_2
 if os.path.isfile(dir_meds+tile+'_r6050'+p+'_r_meds-delve.fits.fz'):
     filename = [dir_meds+tile+'_r6050'+p+'_r_meds-delve.fits.fz',
@@ -52,7 +58,27 @@ if os.path.isfile(dir_meds+tile+'_r6117'+p+'_r_meds-delve.fits.fz'):
                 dir_meds+tile+'_r6117'+p+'_i_meds-delve.fits.fz',
                 dir_meds+tile+'_r6117'+p+'_z_meds-delve.fits.fz']
 
-with open('/home/chihway/mcal_sim_test/runs/run_template/metacal.yaml', 'r') as fp:
+#DR3_1_2 reprocess 
+if os.path.isfile(dir_meds+tile+'_r6321'+p+'_r_meds-delve.fits.fz'):
+    filename = [dir_meds+tile+'_r6321'+p+'_r_meds-delve.fits.fz',
+                dir_meds+tile+'_r6321'+p+'_i_meds-delve.fits.fz',
+                dir_meds+tile+'_r6321'+p+'_z_meds-delve.fits.fz']
+
+
+#DR3_1 reprocess 
+if os.path.isfile(dir_meds+tile+'_r6352'+p+'_r_meds-delve.fits.fz'):
+    filename = [dir_meds+tile+'_r6352'+p+'_r_meds-delve.fits.fz',
+                dir_meds+tile+'_r6352'+p+'_i_meds-delve.fits.fz',
+                dir_meds+tile+'_r6352'+p+'_z_meds-delve.fits.fz']
+
+
+#DR3_1 reprocess 
+if os.path.isfile(dir_meds+tile+'_r6353'+p+'_r_meds-delve.fits.fz'):
+    filename = [dir_meds+tile+'_r6353'+p+'_r_meds-delve.fits.fz',
+                dir_meds+tile+'_r6353'+p+'_i_meds-delve.fits.fz',
+                dir_meds+tile+'_r6353'+p+'_z_meds-delve.fits.fz']
+
+with open('/home/chihway/mcal_sim_test/runs/run_template/metacal_production.yaml', 'r') as fp:
      mcal_config = yaml.load(fp, Loader=yaml.Loader)
 
 output = run_metacal(filename, seed, mcal_config) #seed can be an integer, for instance

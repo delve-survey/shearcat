@@ -5,7 +5,7 @@
 meta=/project/chihway/chihway/shearcat/Tilelist/07112023/Tilelist_Reprocess_20231207.csv
 
 
-for i in [ 241 875 886 2227 2345 2381 3992 4280 ]  #((i=0;i<4000;i++)) 
+for i in 886 #((i=4503;i<4710;i++)) 
 
 do
 echo $i
@@ -32,14 +32,14 @@ python download_tile.py ${i} ${meta}
 
 
 echo "#!/bin/sh
-#SBATCH -t 20:00:00
-#SBATCH --partition=caslake
+#SBATCH -t 36:00:00
+#SBATCH --partition=amd
 ##SBATCH --partition=broadwl
 #SBATCH --account=pi-chihway
 #SBATCH --job-name=metacal_${i}
-##SBATCH --exclusive
+#SBATCH --exclusive
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=48
+##SBATCH --ntasks-per-node=48
 ##SBATCH --ntasks-per-node=28
 
 python measure_mcal_batch.py ${i} ${meta}
