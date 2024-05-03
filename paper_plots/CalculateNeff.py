@@ -14,15 +14,25 @@ nside = 4096
 project_dir = '/project/chihway/data/decade/'
 master_cat = project_dir+'metacal_gold_combined_'+tag+'.hdf'
 master_mask = project_dir+'metacal_gold_combined_mask_'+tag+'.hdf'
-tomo = 0
+tomo=1
 
 # read mask ########################
-with h5py.File(master_mask, 'r') as f:
-    mask_noshear = f['baseline_mcal_mask_noshear'][:]
-    mask_1p = f['baseline_mcal_mask_1p'][:]
-    mask_1m = f['baseline_mcal_mask_1m'][:]
-    mask_2p = f['baseline_mcal_mask_2p'][:]
-    mask_2m = f['baseline_mcal_mask_2m'][:]
+if tomo==0:
+    with h5py.File(master_mask, 'r') as f:
+        mask_noshear = f['baseline_mcal_mask_noshear'][:]
+        mask_1p = f['baseline_mcal_mask_1p'][:]
+        mask_1m = f['baseline_mcal_mask_1m'][:]
+        mask_2p = f['baseline_mcal_mask_2p'][:]
+        mask_2m = f['baseline_mcal_mask_2m'][:]
+
+if tomo==1:
+    with h5py.File(master_cat, 'r') as f:
+        mask_noshear = f['baseline_mcal_mask_noshear'][:]
+        mask_1p = f['baseline_mcal_mask_1p'][:]
+        mask_1m = f['baseline_mcal_mask_1m'][:]
+        mask_2p = f['baseline_mcal_mask_2p'][:]
+        mask_2m = f['baseline_mcal_mask_2m'][:]
+    
 print('read mask')
 
 def weight_average(values, weights):
@@ -46,6 +56,7 @@ R_11 = []
 R_11s = []
 R_22 = []
 R_22s = []
+Ngal = []
 
 if tomo==1:
     for i in range(4):
@@ -72,6 +83,7 @@ if tomo==1:
         R_11s.append(R11s)
         R_22.append(R22)
         R_22s.append(R22s)
+        Ngal.append([len(w[mask_noshear_bin]), len(w[mask_1p_bin]), len(w[mask_1m_bin]), len(w[mask_2p_bin]), len(w[mask_2m_bin])])
     
 print("non-tomographic")
 mask_noshear_bin = (mask_noshear>0)
@@ -95,6 +107,7 @@ R_11.append(R11)
 R_11s.append(R11s)
 R_22.append(R22)
 R_22s.append(R22s)
+Ngal.append([len(w[mask_noshear_bin]), len(w[mask_1p_bin]), len(w[mask_1m_bin]), len(w[mask_2p_bin]), len(w[mask_2m_bin])])
 
 del g_noshear, g_1p, g_1m, g_2p, g_2m
 
@@ -242,6 +255,6 @@ for i in range(NN):
     print("%.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f " 
     % (N[i]*60*60, R_11[i], R_11s[i], R_11[i]+R_11s[i], R_22[i], R_22s[i], R_22[i]+R_22s[i], Neff_C13[i], Sigmae_C13[i], Neff_H12[i], Sigmae_H12[i]))
 
-np.savez('metadata_'+str(tag)+'.npz', R11=R11, R11s=R11s, R22=R22, R22s=R22s, area=area, N=N, Neff_C13=Neff_C13, Sigmae_C13=Sigmae_C13, Neff_H12=Neff_H12, Sigmae_H12=Sigmae_H12)
+np.savez('metadata_'+str(tag)+'.npz', R11=R_11, R11s=R_11s, R22=R_22, R22s=R_22s, area=area, N=N, Neff_C13=Neff_C13, Sigmae_C13=Sigmae_C13, Neff_H12=Neff_H12, Sigmae_H12=Sigmae_H12, Ngal=Ngal)
 
 
