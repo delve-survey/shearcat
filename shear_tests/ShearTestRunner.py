@@ -529,7 +529,7 @@ class AllTests(object):
         hpix = hp.ang2pix(NSIDE, fc_ra, fc_dec, lonlat  = True)
         fc_w = wmap[hpix]
         hpix = hp.ang2pix(NSIDE, theta, phi)
-        rand_w = wmap[hpix]
+        rand_w = Ngal[hpix] #Don't downweight randoms by Ncen (they're already uniform across sky), just upweight by galaxies
         
         #convert to RA and DEC
         rand_ra  = phi*180/np.pi
@@ -546,6 +546,7 @@ class AllTests(object):
         #Compute the rowe stats
         NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250, rng = np.random.default_rng(seed = 42),
                                     sep_units = 'arcmin',verbose = 0, bin_slop = 0.1, var_method='jackknife')
+        RG = NG.copy()
         
         NG.process(cat_t, cat_g, low_mem=True)
         NG.write(os.path.join(self.output_path, 'fieldcenter_treecorr.txt'))
@@ -555,12 +556,16 @@ class AllTests(object):
         print("FINISHED true_shear")
 
         
-        NG.process(cat_r, cat_g, low_mem=True)
-        NG.write(os.path.join(self.output_path, 'fieldcenter_rands_treecorr.txt'))
-        cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
+        RG.process(cat_r, cat_g, low_mem=True)
+        RG.write(os.path.join(self.output_path, 'fieldcenter_rands_treecorr.txt'))
+        cov_jk = treecorr.estimate_multi_cov([RG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
         np.savetxt(os.path.join(self.output_path, 'fieldcenter_rands_cov_treecorr.txt'), cov_jk)
         
         print("FINISHED rand_shear")
+        
+        cov_jk = treecorr.estimate_multi_cov([NG, RG], 'jackknife', func = lambda x : np.concatenate([x[0].xi - x[1].xi, 
+                                                                                                      x[0].xi_im - x[1].xi_im]))
+        np.savetxt(os.path.join(self.output_path, 'fieldcenter_diff_cov_treecorr.txt'), cov_jk)
 
     @timeit
     def star_weights_map(self, gal_ra, gal_dec, gal_w, psf_ra, psf_dec, NSIDE = 256):
@@ -580,8 +585,24 @@ class AllTests(object):
 
         weight_map = np.zeros_like(star)
         weight_map[star != 0] = galaxy[star != 0]/star[star != 0]
+        
 
         return weight_map
+    
+    @timeit
+    def gal_counts_map(self, gal_ra, gal_dec, gal_w, NSIDE = 256):
+
+        #NOW COMPUTE STAR WEIGHTS
+        galaxy = np.zeros(hp.nside2npix(NSIDE))
+
+        pix = hp.ang2pix(NSIDE, gal_ra, gal_dec, lonlat = True)
+        unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
+        galaxy[unique_pix] += np.bincount(idx_rep, weights = gal_w)
+        
+        weight_map = galaxy
+
+        return weight_map
+    
     
     @timeit
     def tangential_shear_stars(self):
@@ -647,17 +668,22 @@ class AllTests(object):
             psf_w    = psf_w[Mask]
             del pix
 
-
             #NOW MAKE A RANDOMS CATALOG
-            N_randoms = 1_000_000_000 #Doing rejection sampling so start with many more points than needed
+            weight_map = self.gal_counts_map(gal_ra, gal_dec, gal_w, NSIDE = NSIDE)
+            N_randoms  = 300_000_000 #Doing rejection sampling so start with many more points than needed
             phi   = np.random.uniform(0, 2*np.pi, N_randoms)
             theta = np.arccos(1 - 2*np.random.uniform(0, 1, N_randoms))
 
             # Remove points that aren't within the galaxy Mask
-            hpix = hp.ang2pix(NSIDE, theta, phi)
-            pix_mask   = weight_map[hpix] > 0
-            phi, theta = phi[pix_mask], theta[pix_mask]
-            rand_w     = weight_map[hpix][pix_mask]
+            gmask      = np.bincount(hp.ang2pix(4096, gal_ra, gal_dec, lonlat = True), minlength = hp.nside2npix(4096)) > 0
+            pix_mask   = gmask[hp.ang2pix(4096, theta, phi)] > 0; del gmask;
+            phi, theta = phi[pix_mask], theta[pix_mask]; del pix_mask;
+            rand_w     = weight_map[hp.ang2pix(NSIDE, theta, phi)]
+            
+            print("USING N_RANDOMS = ", len(rand_w))
+            
+#             psf_w    = np.ones_like(psf_w);  print("FORCEFULLY SETTING STAR WEIGHTS TO 1")
+#             rand_w   = np.ones_like(rand_w); print("FORCEFULLY SETTING RAND WEIGHTS TO 1")
 
             #convert to RA and DEC
             rand_ra  = phi*180/np.pi
@@ -680,16 +706,23 @@ class AllTests(object):
             #Compute the rowe stats
             NG = treecorr.NGCorrelation(nbins = 25, min_sep = 2.5, max_sep = 250, rng = np.random.default_rng(seed = 42),
                                         sep_units = 'arcmin',verbose = 0, bin_slop = 0.1, var_method='jackknife')
+            
+            RG = NG.copy()
 
             NG.process(cat_s, cat_g, low_mem=True)
-            NG.write(os.path.join(self.output_path, 'coadd_starshears_%s_treecorr.txt' % m_name))
+            NG.write(os.path.join(self.output_path, 'starshears_%s_treecorr.txt' % m_name))
             cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
-            np.savetxt(os.path.join(self.output_path, 'coadd_starshears_%s_cov_treecorr.txt' % m_name), cov_jk)
+            np.savetxt(os.path.join(self.output_path, 'starshears_%s_cov_treecorr.txt' % m_name), cov_jk)
 
-            NG.process(cat_r, cat_g, low_mem=True)
-            NG.write(os.path.join(self.output_path, 'coadd_starshears_%s_rands_treecorr.txt' % m_name))
-            cov_jk = treecorr.estimate_multi_cov([NG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
-            np.savetxt(os.path.join(self.output_path, 'coadd_starshears_%s_rands_cov_treecorr.txt' % m_name), cov_jk)
+            RG.process(cat_r, cat_g, low_mem=True)
+            RG.write(os.path.join(self.output_path, 'starshears_%s_rands_treecorr.txt' % m_name))
+            cov_jk = treecorr.estimate_multi_cov([RG], 'jackknife', func = lambda x : np.concatenate([x[0].xi, x[0].xi_im])) 
+            np.savetxt(os.path.join(self.output_path, 'starshears_%s_rands_cov_treecorr.txt' % m_name), cov_jk)
+            
+            cov_jk = treecorr.estimate_multi_cov([NG, RG], 'jackknife', func = lambda x : np.concatenate([x[0].xi - x[1].xi, 
+                                                                                                          x[0].xi_im - x[1].xi_im])) 
+            np.savetxt(os.path.join(self.output_path, 'starshears_%s_diff_cov_treecorr.txt' % m_name), cov_jk)
+            
             
     @timeit
     def tangential_shear_coadd_stars(self):
