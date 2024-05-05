@@ -162,7 +162,7 @@ class AllTests(object):
                 T       = f[f'mcal_T_{label}'][:][self.galaxy_cat_inds]
                 flags   = f['mcal_flags'][:][self.galaxy_cat_inds]
                 
-            # We don't use the gold cuts, as the expectations is to include them
+            # We don't use any of the area-based cuts, as the expectations is to include them
             # in the indices that are passed in.
 
             #GOLD_Foreground  = hp.read_map(fgpath, dtype = int)
@@ -586,8 +586,8 @@ class AllTests(object):
         weight_map = np.zeros_like(star)
         weight_map[star != 0] = galaxy[star != 0]/star[star != 0]
         
-
         return weight_map
+    
     
     @timeit
     def gal_counts_map(self, gal_ra, gal_dec, gal_w, NSIDE = 256):
@@ -849,7 +849,6 @@ class AllTests(object):
             ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
             dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
             w   = f['mcal_g_w'][:][self.galaxy_cat_inds][Mask]
-            #w   = np.ones_like(w)
             g1, g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
             
              #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
@@ -859,27 +858,31 @@ class AllTests(object):
         R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
         g1, g2 = g1/R11, g2/R22
 
-        #Need a -1 for g2 due to Namaster definition
+        #Need a -1 for g2 in R (not T) due to Namaster definition
         T = treecorr.Catalog(g1 = g1[::], g2 = g2[::], ra = ra[::], dec = dec[::], w = w[::], ra_units='deg',dec_units='deg', npatch = self.Npatch)
-        R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = -g2, w = w, NSIDE = nside); del ra, dec, g1, g2
-        C = self.MakeMapFromCls(self.sim_Cls, NSIDE = nside)
+        #R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = -g2, w = w, NSIDE = nside); del ra, dec, g1, g2
+        #C = self.MakeMapFromCls(self.sim_Cls, NSIDE = nside)
         
-        #Process regular Bmodes
-        X    = self.BmodeRunner(R, C, 42, njobs = 1)
-        data = X.process_data()
-        Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
+        
+        ##############################################
+        # No harmonic-space Bmodes in this test
+        ##############################################
+        ##Process regular Bmodes
+        #X    = self.BmodeRunner(R, C, 42, njobs = 1)
+        #data = X.process_data()
+        #Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
+        #
+        #np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
+        #np.save(self.output_path + '/Bmode_Noise.npy', Cov)
+        #
+        #
+        ##Process pure Bmodes
+        #X    = self.PureBmodeRunner(R, C, 42, njobs = 1)
+        #data = X.process_data()
+        #Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
 
-        np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
-        np.save(self.output_path + '/Bmode_Noise.npy', Cov)
-
-
-        #Process pure Bmodes
-        X    = self.PureBmodeRunner(R, C, 42, njobs = 1)
-        data = X.process_data()
-        Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
-
-        np.save(self.output_path + '/PureBmode.npy', np.vstack([data,  X.ell_eff]))
-        np.save(self.output_path + '/PureBmode_Noise.npy', Cov)
+        #np.save(self.output_path + '/PureBmode.npy', np.vstack([data,  X.ell_eff]))
+        #np.save(self.output_path + '/PureBmode_Noise.npy', Cov)
         
         
         #Process Matt's real-space E/B estimator
@@ -1329,7 +1332,7 @@ class AllTests(object):
             #NOW AVERAGE ACROSS FOOTPRINTS
             ########################################################################################################################
             
-            for SNR_threshold in [1, 20, 40, 60, 80]:
+            for SNR_threshold in [1, 20, 40, 60, 80, 100, 150]:
                 
                 with open(self.output_path + '/PSF_summaries.txt', 'a') as f:
                     print("\n--------------------------------------------------------------", file = f)
@@ -1808,12 +1811,13 @@ if __name__ == '__main__':
     if np.logical_or(args['All'], args['shear_vs_X']):       RUNNER.shear_vs_X()
     if np.logical_or(args['All'], args['gt_field_centers']): RUNNER.tangential_shear_field_centers()
     if np.logical_or(args['All'], args['gt_stars']):         RUNNER.tangential_shear_stars()
-    if np.logical_or(args['All'], args['gt_coadd_stars']):   RUNNER.tangential_shear_coadd_stars()
     if np.logical_or(args['All'], args['rho_stats']):        RUNNER.rho_stats()
     if np.logical_or(args['All'], args['psf_color']):        RUNNER.psf_color()
     if np.logical_or(args['All'], args['Bmodes']):           RUNNER.Bmodes()
     
-    #This takes really long time so we run it separately, always!
-    if args['MRBmode_psf']: RUNNER.MRBmode_psf()
+    
+    if args['MRBmode_psf']:      RUNNER.MRBmode_psf() #This takes really long time so we run it separately, always!
+    if args['gt_coadd_stars']:   RUNNER.tangential_shear_coadd_stars() #This isn't needed in standard tests, so skip it
+    
         
     
