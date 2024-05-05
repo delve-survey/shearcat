@@ -73,34 +73,46 @@ if __name__ == '__main__':
                 f.create_dataset(c[5:], data = get_column(filelist, c)[MASK])
                 
         #Deredden quantities
+        del MASK
+        b = f['BAND'][:].astype('U1')
         for name in ['SFD98', 'Planck13']:
 
+            print("IN", name)
+            
             if name == 'SFD98':
                 EXTINCTION = hp.read_map('/project/chihway/dhayaa/DECADE/Extinction_Maps/ebv_sfd98_nside_4096_ring_equatorial.fits')
                 R_SFD98    = EXTINCTION[hp.ang2pix(4096, f['ra'][:], f['dec'][:], lonlat = True)]
                 Ag, Ar, Ai, Az = R_SFD98*3.186, R_SFD98*2.140, R_SFD98*1.569, R_SFD98*1.196
+                
+                del R_SFD98, EXTINCTION
 
             elif name == 'Planck13':
                 EXTINCTION = hp.read_map('/project/chihway/dhayaa/DECADE/Extinction_Maps/ebv_planck13_nside_4096_ring_equatorial.fits')
                 R_PLK13    = EXTINCTION[hp.ang2pix(4096, f['ra'][:], f['dec'][:], lonlat = True)]
                 Ag, Ar, Ai, Az = R_PLK13*4.085, R_PLK13*2.744, R_PLK13*2.012, R_PLK13*1.533
+                
+                del R_PLK13, EXTINCTION
 
-            #Compute the extinction factors based on what band the measurement is
+            
+            #Compute the extinction factors based on what band the measurement is in
             A = np.zeros_like(f['ra']) + np.NaN
-            b = f['BAND'][:].astype('U1')
             for band, ext in zip(['g', 'r', 'i', 'z'], [Ag, Ar, Ai, Az]):
                 A = np.where(b == band, ext, A)
-                
+            
+            del Ag, Ar, Ai, Az
             assert np.isnan(A).sum() == 0, "Hmm. There are somehow %d NaNs in the extinction array" % np.isnan(A).sum()
-                
-                
+            
+            
             for c in ['FLUXERR_APER_8', 'FLUXERR_AUTO', 'FLUX_APER_8', 'FLUX_AUTO']:
 
                 print(c + '_dered')
                 arr = f[c][:] * 10**(A/2.5)
                 f.create_dataset(c + '_DERED_' + name.upper(), data = arr)
 
-            f.create_dataset('A_' + name.lower(), data = A)            
+            f.create_dataset('A_' + name.lower(), data = A)
+            
+            del A, arr
+            print("I FINISHED", name.upper())
 
             
             
