@@ -23,12 +23,11 @@ def timeit(func):
 class SysmapTestRunner:
     
     
-    def __init__(self, NSIDE, data_path, mask_path):
+    def __init__(self, NSIDE, data_path):
         
        
         self.NSIDE = NSIDE
         self.data_path = data_path
-        self.mask_path = mask_path
         
         self.Npatch = 100
     
@@ -61,7 +60,8 @@ class SysmapTestRunner:
     def get_response_maps(self):
         
         
-        with h5py.File(self.mask_path, 'r') as f:
+        with h5py.File(self.data_path, 'r') as f:
+            
             m    = f['baseline_mcal_mask_noshear'][::] > 0            
             m_1p = f['baseline_mcal_mask_1p'][::] > 0
             m_1m = f['baseline_mcal_mask_1m'][::] > 0
@@ -69,8 +69,7 @@ class SysmapTestRunner:
             m_2m = f['baseline_mcal_mask_2m'][::] > 0
 
             print("FINISHED LOADING MASKS")
-        
-        with h5py.File(self.data_path, 'r') as f:
+            
 
             ra  = f['RA'][::]
             dec = f['DEC'][::]
@@ -112,11 +111,9 @@ class SysmapTestRunner:
     @timeit
     def get_data_maps(self):
         
-        with h5py.File(self.mask_path, 'r') as f:
-    
-            mask = f['baseline_mcal_mask_noshear'][::] > 0
-
         with h5py.File(self.data_path, 'r') as f:
+            
+            mask = f['baseline_mcal_mask_noshear'][::] > 0
 
             ra = f['RA'][::][mask]
             dec = f['DEC'][::][mask]
