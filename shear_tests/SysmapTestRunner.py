@@ -29,7 +29,7 @@ class SysmapTestRunner:
         self.NSIDE = NSIDE
         self.data_path = data_path
         
-        self.Npatch = 100
+        self.Npatch = 150
     
     
     @timeit
