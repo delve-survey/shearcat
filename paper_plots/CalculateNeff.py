@@ -57,6 +57,8 @@ R_11s = []
 R_22 = []
 R_22s = []
 Ngal = []
+mean_e1 = []
+mean_e2 = []
 
 if tomo==1:
     for i in range(4):
@@ -84,7 +86,12 @@ if tomo==1:
         R_22.append(R22)
         R_22s.append(R22s)
         Ngal.append([len(w[mask_noshear_bin]), len(w[mask_1p_bin]), len(w[mask_1m_bin]), len(w[mask_2p_bin]), len(w[mask_2m_bin])])
-    
+        mean_e1.append(weight_average(g_noshear[:,0][mask_noshear_bin], w[mask_noshear_bin])/R11tot)
+        mean_e2.append(weight_average(g_noshear[:,1][mask_noshear_bin], w[mask_noshear_bin])/R22tot)
+        print(np.mean(g_noshear[:,0][mask_noshear_bin])/R11tot)
+        print(np.mean(g_noshear[:,1][mask_noshear_bin])/R22tot)
+
+        
 print("non-tomographic")
 mask_noshear_bin = (mask_noshear>0)
 mask_1p_bin = (mask_1p>0)
@@ -108,6 +115,11 @@ R_11s.append(R11s)
 R_22.append(R22)
 R_22s.append(R22s)
 Ngal.append([len(w[mask_noshear_bin]), len(w[mask_1p_bin]), len(w[mask_1m_bin]), len(w[mask_2p_bin]), len(w[mask_2m_bin])])
+mean_e1.append(weight_average(g_noshear[:,0][mask_noshear_bin], w[mask_noshear_bin])/R11tot)
+mean_e2.append(weight_average(g_noshear[:,1][mask_noshear_bin], w[mask_noshear_bin])/R22tot)
+
+print(np.mean(g_noshear[:,0][mask_noshear_bin])/R11tot)
+print(np.mean(g_noshear[:,1][mask_noshear_bin])/R22tot)
 
 del g_noshear, g_1p, g_1m, g_2p, g_2m
 
@@ -252,9 +264,9 @@ else:
     NN=1
     
 for i in range(NN):
-    print("%.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f " 
-    % (N[i]*60*60, R_11[i], R_11s[i], R_11[i]+R_11s[i], R_22[i], R_22s[i], R_22[i]+R_22s[i], Neff_C13[i], Sigmae_C13[i], Neff_H12[i], Sigmae_H12[i]))
+    print("%.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.5f & %.5f " 
+    % (N[i]*60*60, R_11[i], R_11s[i], R_11[i]+R_11s[i], R_22[i], R_22s[i], R_22[i]+R_22s[i], Neff_C13[i], Sigmae_C13[i], Neff_H12[i], Sigmae_H12[i], mean_e1[i], mean_e2[i]))
 
-np.savez('metadata_'+str(tag)+'.npz', R11=R_11, R11s=R_11s, R22=R_22, R22s=R_22s, area=area, N=N, Neff_C13=Neff_C13, Sigmae_C13=Sigmae_C13, Neff_H12=Neff_H12, Sigmae_H12=Sigmae_H12, Ngal=Ngal)
+np.savez('metadata_'+str(tag)+'.npz', R11=R_11, R11s=R_11s, R22=R_22, R22s=R_22s, area=area, N=N, Neff_C13=Neff_C13, Sigmae_C13=Sigmae_C13, Neff_H12=Neff_H12, Sigmae_H12=Sigmae_H12, Ngal=Ngal, mean_e1=mean_e1, mean_e2=mean_e2)
 
 
