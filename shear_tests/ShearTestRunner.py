@@ -76,6 +76,97 @@ class AllTests(object):
 
 
     @timeit
+    def mean_shear(self):
+        
+        dgamma = 0.02
+        Mask0  = self.get_mcal_Mask('noshear')
+        Mask1p = self.get_mcal_Mask('1p')
+        Mask2p = self.get_mcal_Mask('2p')
+        Mask1m = self.get_mcal_Mask('1m')
+        Mask2m = self.get_mcal_Mask('2m')
+        
+        with h5py.File(self.galaxy_cat, 'r') as f:
+
+            mcal_g_w  = f['mcal_g_w'][:][self.galaxy_cat_inds]
+            mcal_g_noshear = f['mcal_g_noshear'][:][self.galaxy_cat_inds]
+            mcal_g_1p = f['mcal_g_1p'][:][self.galaxy_cat_inds]
+            mcal_g_2p = f['mcal_g_2p'][:][self.galaxy_cat_inds]
+            mcal_g_1m = f['mcal_g_1m'][:][self.galaxy_cat_inds]
+            mcal_g_2m = f['mcal_g_2m'][:][self.galaxy_cat_inds]
+        
+        
+        R11_p  = np.sum( (mcal_g_1p[Mask0, 0]      *  mcal_g_w[Mask0])  )
+        R11_m  = np.sum( (mcal_g_1m[Mask0, 0]      *  mcal_g_w[Mask0])  )
+        R11s_p = np.sum( (mcal_g_noshear[Mask1p, 0] *  mcal_g_w[Mask1p]) )
+        R11s_m = np.sum( (mcal_g_noshear[Mask1m, 0] *  mcal_g_w[Mask1m]) )
+        
+        
+        R22_p  = np.sum( (mcal_g_2p[Mask0, 1]      *  mcal_g_w[Mask0]) )
+        R22_m  = np.sum( (mcal_g_2m[Mask0, 1]      *  mcal_g_w[Mask0]) )
+        R22s_p = np.sum( (mcal_g_noshear[Mask2p, 1] *  mcal_g_w[Mask2p]))
+        R22s_m = np.sum( (mcal_g_noshear[Mask2m, 1] *  mcal_g_w[Mask2m]))
+
+        
+        R_counts     = np.sum(mcal_g_w[Mask0])
+        Rs_1p_counts = np.sum(mcal_g_w[Mask1p])
+        Rs_1m_counts = np.sum(mcal_g_w[Mask1m])
+        Rs_2p_counts = np.sum(mcal_g_w[Mask2p])
+        Rs_2m_counts = np.sum(mcal_g_w[Mask2m])
+
+        
+        e1 = np.sum( (mcal_g_noshear[:, 0] * mcal_g_w)[Mask0] )
+        e2 = np.sum( (mcal_g_noshear[:, 1] * mcal_g_w)[Mask0] )
+
+        output = np.zeros([4, self.Npatch])
+        #Remove individual patches now
+        for j in tqdm(range(self.Npatch), desc = 'Mean shear'):
+
+            mask = self.gal_inds == j
+
+            R11_p_here  = R11_p  - np.sum( (mcal_g_1p[Mask0 & mask, 0]       * mcal_g_w[Mask0 & mask]) )
+            R11_m_here  = R11_m  - np.sum( (mcal_g_1m[Mask0 & mask, 0]       * mcal_g_w[Mask0 & mask]) )
+            R11s_p_here = R11s_p - np.sum( (mcal_g_noshear[Mask1p & mask, 0] * mcal_g_w[Mask1p & mask]) )
+            R11s_m_here = R11s_m - np.sum( (mcal_g_noshear[Mask1m & mask, 0] * mcal_g_w[Mask1m & mask]) )
+
+
+            R22_p_here  = R22_p  - np.sum( (mcal_g_2p[Mask0 & mask, 1]      * mcal_g_w[Mask0 & mask]) )
+            R22_m_here  = R22_m  - np.sum( (mcal_g_2m[Mask0 & mask, 1]      * mcal_g_w[Mask0 & mask]) )
+            R22s_p_here = R22s_p - np.sum( (mcal_g_noshear[Mask2p & mask, 1] * mcal_g_w[Mask2p & mask]) )
+            R22s_m_here = R22s_m - np.sum( (mcal_g_noshear[Mask2m & mask, 1] * mcal_g_w[Mask2m & mask]) )
+
+
+            R_counts_here     = R_counts     - np.sum( mcal_g_w[Mask0 & mask] )
+            Rs_1p_counts_here = Rs_1p_counts - np.sum( mcal_g_w[Mask1p & mask] )
+            Rs_1m_counts_here = Rs_1m_counts - np.sum( mcal_g_w[Mask1m & mask] )
+            Rs_2p_counts_here = Rs_2p_counts - np.sum( mcal_g_w[Mask2p & mask] )
+            Rs_2m_counts_here = Rs_2m_counts - np.sum( mcal_g_w[Mask2m & mask] )
+
+            e1_here = e1 - np.sum( (mcal_g_noshear[Mask0 & mask, 0] * mcal_g_w[Mask0 & mask]) )
+            e2_here = e2 - np.sum( (mcal_g_noshear[Mask0 & mask, 1] * mcal_g_w[Mask0 & mask]) )
+
+
+            R11  = (R11_p_here/R_counts_here - R11_m_here/R_counts_here)/dgamma
+            R11s = (R11s_p_here/Rs_1p_counts_here - R11s_m_here/Rs_1m_counts_here)/dgamma
+            R11_tot = R11 + R11s
+
+            R22  = (R22_p_here/R_counts_here - R22_m_here/R_counts_here)/dgamma
+            R22s = (R22s_p_here/Rs_2p_counts_here - R22s_m_here/Rs_2m_counts_here)/dgamma
+            R22_tot = R22 + R22s
+
+            output[0, j] = e1_here/R_counts_here
+            output[1, j] = e2_here/R_counts_here
+            
+            output[2, j] = e1_here/R_counts_here / R11_tot
+            output[3, j] = e2_here/R_counts_here / R22_tot
+            
+            print(output[:, j])
+            
+        savepath = self.output_path + '/mean_shear.npy'
+        np.save(savepath, output)
+        
+        
+        
+    @timeit
     def brighter_fatter_effect(self):
 
         N_bin = 30
@@ -1789,6 +1880,7 @@ if __name__ == '__main__':
     
     
     my_parser.add_argument('--All',              action='store_true', default = False)
+    my_parser.add_argument('--mean_shear',       action='store_true', default = False)
     my_parser.add_argument('--brighter_fatter',  action='store_true', default = False)
     my_parser.add_argument('--shear_vs_X',       action='store_true', default = False)
     my_parser.add_argument('--gt_field_centers', action='store_true', default = False)
@@ -1808,6 +1900,7 @@ if __name__ == '__main__':
     
     
     if np.logical_or(args['All'], args['brighter_fatter']):  RUNNER.brighter_fatter_effect()
+    if np.logical_or(args['All'], args['mean_shear']):       RUNNER.mean_shear()
     if np.logical_or(args['All'], args['shear_vs_X']):       RUNNER.shear_vs_X()
     if np.logical_or(args['All'], args['gt_field_centers']): RUNNER.tangential_shear_field_centers()
     if np.logical_or(args['All'], args['gt_stars']):         RUNNER.tangential_shear_stars()
