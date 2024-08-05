@@ -168,18 +168,39 @@ hp.write_map(project_dir+'footprint_mask_delve_cs_'+tag+'.fits', mask_all, dtype
 def neff_H12(w, A):
     return 1./A * (np.sum(w)**2) / (np.sum(w**2))
 
-def sigmae2_H12(w, g1, R1, g2, R2, neff, A):
+def sigmae_H12(w, g1, R1, g2, R2, neff, A):
     return np.sqrt(0.5*((np.sum(w**2*(g1/R1)**2)/(np.sum(w))**2)+(np.sum(w**2*(g2/R2)**2)/(np.sum(w))**2))*(A*neff))
 
-# should double check this...
-def sigmae2_C13(w, g1, R1, g2, R2, sigma2_e1_m, sigma2_e2_m):
-    return np.sqrt(0.5* np.sum(w**2*((g1/R1)**2+(g2/R2)**2 
-                                                 - sigma2_e1_m/R1**2 - sigma2_e2_m/R2**2)) / np.sum(w**2))
+# this is what is in Marco's paper
+#def sigmae_C13_GS20(w, g1, R1, g2, R2, sigma2_e1_m, sigma2_e2_m):
+#    return np.sqrt(0.5* np.sum(w**2*((g1/R1)**2+(g2/R2)**2 
+#                                                 - sigma2_e1_m/R1**2 - sigma2_e2_m/R2**2)) / np.sum(w**2))
 
-def neff_C13(w, g1, R1, g2, R2, sigma2_e1_m, sigma2_e2_m, A):
-    return (1./A * (np.sum(w)**2) / (np.sum(w**2))
-                        *(np.sum(w**2*((g1/R1)**2+(g2/R2)**2 - sigma2_e1_m/R1**2 - sigma2_e2_m/R2**2)))
-                        / np.sum(w**2*((g1/R1)**2+(g2/R2)**2)))
+# this is what is in Marco's paper
+#def neff_C13_GS20(w, g1, R1, g2, R2, sigma2_e1_m, sigma2_e2_m, A, sigmae):
+#    return (sigmae**2/A * np.sum(w**2)/np.sum(w**2*(sigmae**2+0.5*(sigma2_e1_m/R1**2+sigma2_e2_m/R2**2))))
+    
+
+# this is so that sigmae^2/neff agrees with H12, prob should not use this
+#def neff_C13_test(w, g1, R1, g2, R2, sigma2_e1_m, sigma2_e2_m, A):
+#    return (1./A * (np.sum(w)**2) / (np.sum(w**2))
+#                        *(np.sum(w**2*((g1/R1)**2+(g2/R2)**2 - sigma2_e1_m/R1**2 - sigma2_e2_m/R2**2)))
+#                        / np.sum(w**2*((g1/R1)**2+(g2/R2)**2)))
+
+# this is just from the definition of neff
+#def neff_C13_C24(w, g1, R1, g2, R2, sigmae, A, sigma2_e1_m, sigma2_e2_m):
+#    return (1/A * np.sum(w*(sigmae**2)/(0.5*((g1/R1)**2+(g2/R2)**2)))/np.sum(w)) 
+
+
+def sigmae_C13_C24(w, g1, R1, g2, R2, sigma2_e1_m, sigma2_e2_m):
+    w = w*len(w)/np.sum(w)
+    return np.sqrt(0.5* np.sum(w*((g1/R1)**2+(g2/R2)**2 
+                                             - sigma2_e1_m/R1**2 - sigma2_e2_m/R2**2)) / np.sum(w))
+
+def neff_C13_C24(w, g1, R1, g2, R2, sigma2_e1_m, sigma2_e2_m, A, sigmae):
+    w = w*len(w)/np.sum(w)
+    return (1/A * np.sum(w*(sigmae**2)/(sigmae**2+0.5*(sigma2_e1_m/R1**2+sigma2_e2_m/R2**2)))) 
+
 
 with h5py.File(project_dir+'metacal_gold_combined_'+tag+'.hdf', 'r') as h5r:
     mcal_g_cov = h5r['mcal_g_cov_noshear'][:]
@@ -210,10 +231,10 @@ if tomo==1:
         R22tot = R_22[i]+R_22s[i]
                                    
         neff_H12_bin = neff_H12(w_bin, area)
-        sigmae_H12_bin = sigmae2_H12(w_bin, g1_bin, R11tot, g2_bin, R22tot, neff_H12_bin, area)
+        sigmae_H12_bin = sigmae_H12(w_bin, g1_bin, R11tot, g2_bin, R22tot, neff_H12_bin, area)
                                                                     
-        sigmae_C13_bin = sigmae2_C13(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
-        neff_C13_bin = neff_C13(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area)
+        sigmae_C13_bin = sigmae_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
+        neff_C13_bin = neff_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area, sigmae_C13_bin)
                                                                                 
         print("bin"+str(i), neff_H12_bin, sigmae_H12_bin, neff_C13_bin, sigmae_C13_bin)
     
@@ -222,6 +243,9 @@ if tomo==1:
         Sigmae_H12.append(sigmae_H12_bin)
         Sigmae_C13.append(sigmae_C13_bin)
         N.append(len(w_bin)/area/60/60)
+
+        #np.savez('temp_'+str(i)+'.npz', w_bin=w_bin, g1_bin=g1_bin, R11_tot=R11_tot, g2_bin=g2_bin, R22tot=R22tot, 
+        #         sigma2_e1_m=sigma2_e1_m, sigma2_e2_m=sigma2_e2_m, area=area, simgae_C13_bin=sigmae_C)
 
 
 # non-tomographic
@@ -245,10 +269,14 @@ else:
 
 
 neff_H12_bin = neff_H12(w_bin, area)
-sigmae_H12_bin = sigmae2_H12(w_bin, g1_bin, R11tot, g2_bin, R22tot, neff_H12_bin, area)
+sigmae_H12_bin = sigmae_H12(w_bin, g1_bin, R11tot, g2_bin, R22tot, neff_H12_bin, area)
 
-sigmae_C13_bin = sigmae2_C13(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
-neff_C13_bin = neff_C13(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area)
+#sigmae_C13_bin = sigmae_C13_GS20(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
+#neff_C13_bin = neff_C13_GS20(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area, sigmae_C13_bin)
+
+sigmae_C13_bin = sigmae_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
+neff_C13_bin = neff_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area, sigmae_C13_bin)
+
 
 print("non-tomo", neff_H12_bin, sigmae_H12_bin, neff_C13_bin, sigmae_C13_bin)
 
