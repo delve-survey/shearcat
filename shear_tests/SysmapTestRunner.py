@@ -23,16 +23,15 @@ def timeit(func):
 class SysmapTestRunner:
     
     
-    def __init__(self, NSIDE, data_path):
+    def __init__(self, NSIDE, data_path, Npatch = 150):
         
        
         self.NSIDE = NSIDE
         self.data_path = data_path
         
-        self.Npatch = 150
+        self.Npatch = Npatch
     
     
-    @timeit
     def assign_patches(self, ra, dec, centers = None):
 
         
@@ -56,17 +55,21 @@ class SysmapTestRunner:
         return num/denom
     
     
+    def mask_condition(self, mask):
+
+        return mask > 0
+    
     @timeit
     def get_response_maps(self):
         
         
         with h5py.File(self.data_path, 'r') as f:
             
-            m    = f['baseline_mcal_mask_noshear'][::] > 0            
-            m_1p = f['baseline_mcal_mask_1p'][::] > 0
-            m_1m = f['baseline_mcal_mask_1m'][::] > 0
-            m_2p = f['baseline_mcal_mask_2p'][::] > 0
-            m_2m = f['baseline_mcal_mask_2m'][::] > 0
+            m    = self.mask_condition(f['baseline_mcal_mask_noshear'][:])
+            m_1p = self.mask_condition(f['baseline_mcal_mask_1p'][:])
+            m_1m = self.mask_condition(f['baseline_mcal_mask_1m'][:])
+            m_2p = self.mask_condition(f['baseline_mcal_mask_2p'][:])
+            m_2m = self.mask_condition(f['baseline_mcal_mask_2m'][:])
 
             print("FINISHED LOADING MASKS")
             
@@ -113,7 +116,7 @@ class SysmapTestRunner:
         
         with h5py.File(self.data_path, 'r') as f:
             
-            mask = f['baseline_mcal_mask_noshear'][::] > 0
+            mask = self.mask_condition(f['baseline_mcal_mask_noshear'][:])
 
             ra = f['RA'][::][mask]
             dec = f['DEC'][::][mask]
@@ -138,7 +141,6 @@ class SysmapTestRunner:
         return g1, g2, N
     
     
-    @timeit
     def get_sys_map(self, map_type, band):
         
         p = f'/project/kadrlica/secco/DELVE/combined_dr311+dr312/{map_type}/delve_dr311+dr312_{band}_{map_type}_Nov28th.hsp'
@@ -191,5 +193,40 @@ class SysmapTestRunner:
                         
         
         return results
+
+
+class TomoSysmapTestRunner(SysmapTestRunner):
+
+    def go(self, map_types, bands):
+
+        Results = []
+        for bin in range(4):
+            
+            print(f"STARTING BIN {bin}")
+            #Change how the code uses masking
+            def tmp(mask): return mask == (bin + 1) #Tomobin is 1-indexed
+            setattr(self, 'mask_condition', tmp)
+
+            Results.append(
+                super().go(map_types, bands)
+            )
+
+        Results = np.array(Results)
         
-        
+        return Results
+
+
+if __name__ == "__main__":
+
+    maps  = ['airmass', 'dcr_e1', 'dcr_e2', 'dcr_ddec', 'dcr_dra', 'maglim',  'exptime', 'fwhm', 'skysigma', 'skybrite', 'nexp']
+    bands = ['r', 'i', 'z']
+
+    # RUN   = SysmapTestRunner(NSIDE = 128, data_path = '/project/chihway/data/decade/metacal_gold_combined_20240209.hdf',)
+    # corr  = RUN.go(maps, bands)
+    # np.save('/home/dhayaa/DECADE/shearcat/shear_tests/Paper_plots/SysMapCorr_20240815.npy',     corr,  allow_pickle = True)
+    
+
+
+    RUN   = TomoSysmapTestRunner(NSIDE = 128, data_path = '/project/chihway/data/decade/metacal_gold_combined_20240209.hdf',)
+    tcorr = RUN.go(maps, bands)
+    np.save('/home/dhayaa/DECADE/shearcat/shear_tests/Paper_plots/SysMapTomoCorr_20240815.npy', tcorr, allow_pickle = True)
