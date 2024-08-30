@@ -211,6 +211,38 @@ if operation == 'weights':
     del size_ratio, s2n, weights
 
 
+
+#### shear weights new #############################################
+# (already pre-calculated grid of response and shape noise) 
+
+if operation == 'weights-new':
+
+
+    results = np.load('/project/chihway/dhayaa/DECADE/For_Chihway/grid_quantities_20240827.npy')
+
+    for tag in ['noshear', '1p', '1m', '2p', '2m']:
+        with h5py.File(master_cat, 'r') as f:
+        
+            snr    = f['mcal_s2n_'+tag][:]
+            Tr     = f['mcal_T_ratio_'+tag][:]
+
+        snr = np.nan_to_num(snr)
+        Tr  = np.nan_to_num(Tr)
+        snr_line = results['SNR']
+        Tr_line  = results['T_ratio']
+        w_line   = results['weight']
+        I   = interpolate.NearestNDInterpolator(np.vstack([snr_line, Tr_line]).T, w_line)
+        w   = I(snr, Tr)
+
+        with h5py.File(master_cat, 'a') as h5r:
+            #del h5r['mcal_g_w']
+            h5r.create_dataset('mcal_g_w_'+tag, data = w)
+
+        del snr, Tr
+
+
+
+
 #### dered photometry  #############################################
 
 if operation == 'dered':

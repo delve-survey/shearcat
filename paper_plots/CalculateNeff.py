@@ -14,24 +14,14 @@ nside = 4096
 project_dir = '/project/chihway/data/decade/'
 master_cat = project_dir+'metacal_gold_combined_'+tag+'.hdf'
 master_mask = project_dir+'metacal_gold_combined_mask_'+tag+'.hdf'
-tomo=1
 
 # read mask ########################
-if tomo==0:
-    with h5py.File(master_mask, 'r') as f:
-        mask_noshear = f['baseline_mcal_mask_noshear'][:]
-        mask_1p = f['baseline_mcal_mask_1p'][:]
-        mask_1m = f['baseline_mcal_mask_1m'][:]
-        mask_2p = f['baseline_mcal_mask_2p'][:]
-        mask_2m = f['baseline_mcal_mask_2m'][:]
-
-if tomo==1:
-    with h5py.File(master_cat, 'r') as f:
-        mask_noshear = f['baseline_mcal_mask_noshear'][:]
-        mask_1p = f['baseline_mcal_mask_1p'][:]
-        mask_1m = f['baseline_mcal_mask_1m'][:]
-        mask_2p = f['baseline_mcal_mask_2p'][:]
-        mask_2m = f['baseline_mcal_mask_2m'][:]
+#with h5py.File(master_cat, 'r') as f:
+#    mask_noshear = f['baseline_mcal_mask_noshear'][:]
+#    mask_1p = f['baseline_mcal_mask_1p'][:]
+#    mask_1m = f['baseline_mcal_mask_1m'][:]
+#    mask_2p = f['baseline_mcal_mask_2p'][:]
+#    mask_2m = f['baseline_mcal_mask_2m'][:]
     
 print('read mask')
 
@@ -39,16 +29,6 @@ def weight_average(values, weights):
     return np.sum(values*weights)/np.sum(weights)
 
 # get response #####################
-
-# take this out of the with
-with h5py.File(master_cat, 'r') as h5r:
-    g_noshear = h5r['mcal_g_noshear'][:]
-    g_1p = h5r['mcal_g_1p'][:]
-    g_1m = h5r['mcal_g_1m'][:]
-    g_2p = h5r['mcal_g_2p'][:]
-    g_2m = h5r['mcal_g_2m'][:]
-    w = h5r['mcal_g_w'][:]
-print('read shear')
 
 dgamma = 2*0.01
 
@@ -60,68 +40,84 @@ Ngal = []
 mean_e1 = []
 mean_e2 = []
 
-if tomo==1:
-    for i in range(4):
+for i in range(5):
+
+    if i==4:
+        print('non-tomographic')
+    else:
         print('bin'+str(i))
-                  
+
+    with h5py.File(master_cat, 'r') as h5r:
+        g_1p = h5r['mcal_g_1p'][:]
+        g_1m = h5r['mcal_g_1m'][:]
+        g_2p = h5r['mcal_g_2p'][:]
+        g_2m = h5r['mcal_g_2m'][:]
+        w_noshear = h5r['mcal_g_w_noshear'][:]
+        mask_noshear = h5r['baseline_mcal_mask_noshear'][:]
+
+    if i==4:
+        mask_noshear_bin = (mask_noshear>0)
+    else:
         mask_noshear_bin = (mask_noshear==i+1)
-        mask_1p_bin = (mask_1p==i+1)
-        mask_1m_bin = (mask_1m==i+1)
-        mask_2p_bin = (mask_2p==i+1)
-        mask_2m_bin = (mask_2m==i+1)
-                                          
-        R11 =  (weight_average(g_1p[:,0][mask_noshear_bin],w[mask_noshear_bin]) - weight_average(g_1m[:,0][mask_noshear_bin], w[mask_noshear_bin]))/dgamma
-        R11s = (weight_average(g_noshear[:,0][mask_1p_bin], w[mask_1p_bin]) - weight_average(g_noshear[:,0][mask_1m_bin], w[mask_1m_bin]))/dgamma
-        R22 =  (weight_average(g_2p[:,1][mask_noshear_bin], w[mask_noshear_bin]) - weight_average(g_2m[:,1][mask_noshear_bin], w[mask_noshear_bin]))/dgamma
-        R22s = (weight_average(g_noshear[:,1][mask_2p_bin], w[mask_2p_bin]) - weight_average(g_noshear[:,1][mask_2m_bin], w[mask_2m_bin]))/dgamma
-        R11tot = R11+R11s
-        R22tot = R22+R22s
-                                                                      
-        print('R11', R11, 'R11s', R11s)
-        print('R22', R22, 'R22s', R22s)
-        print('R11tot', R11tot, 'R22tot', R22tot)
+    R11 =  (weight_average(g_1p[:,0][mask_noshear_bin],w_noshear[mask_noshear_bin]) - weight_average(g_1m[:,0][mask_noshear_bin], w_noshear[mask_noshear_bin]))/dgamma
+    R22 =  (weight_average(g_2p[:,1][mask_noshear_bin],w_noshear[mask_noshear_bin]) - weight_average(g_2m[:,1][mask_noshear_bin], w_noshear[mask_noshear_bin]))/dgamma
+    Ngal.append(len(w_noshear[mask_noshear_bin]))
+
+    del g_1p, g_1m, g_2p, g_2m, mask_noshear, mask_noshear_bin
+
     
-        R_11.append(R11)
-        R_11s.append(R11s)
-        R_22.append(R22)
-        R_22s.append(R22s)
-        Ngal.append([len(w[mask_noshear_bin]), len(w[mask_1p_bin]), len(w[mask_1m_bin]), len(w[mask_2p_bin]), len(w[mask_2m_bin])])
-        mean_e1.append(weight_average(g_noshear[:,0][mask_noshear_bin], w[mask_noshear_bin])/R11tot)
-        mean_e2.append(weight_average(g_noshear[:,1][mask_noshear_bin], w[mask_noshear_bin])/R22tot)
-        print(np.mean(g_noshear[:,0][mask_noshear_bin])/R11tot)
-        print(np.mean(g_noshear[:,1][mask_noshear_bin])/R22tot)
+    with h5py.File(master_cat, 'r') as h5r:
+        mask_1p = h5r['baseline_mcal_mask_1p'][:]
+        mask_1m = h5r['baseline_mcal_mask_1m'][:]
+        mask_2p = h5r['baseline_mcal_mask_2p'][:]
+        mask_2m = h5r['baseline_mcal_mask_2m'][:]
+        mask_noshear = h5r['baseline_mcal_mask_noshear'][:]
 
-        
-print("non-tomographic")
-mask_noshear_bin = (mask_noshear>0)
-mask_1p_bin = (mask_1p>0)
-mask_1m_bin = (mask_1m>0)
-mask_2p_bin = (mask_2p>0)
-mask_2m_bin = (mask_2m>0)
+        if i==4:
+            mask_1p_bin = (mask_1p>0)
+            mask_1m_bin = (mask_1m>0)
+            mask_2p_bin = (mask_2p>0)
+            mask_2m_bin = (mask_2m>0)
+            mask_noshear_bin = (mask_noshear>0)
 
-R11 =  (weight_average(g_1p[:,0][mask_noshear_bin],w[mask_noshear_bin]) - weight_average(g_1m[:,0][mask_noshear_bin], w[mask_noshear_bin]))/dgamma
-R11s = (weight_average(g_noshear[:,0][mask_1p_bin], w[mask_1p_bin]) - weight_average(g_noshear[:,0][mask_1m_bin], w[mask_1m_bin]))/dgamma
-R22 =  (weight_average(g_2p[:,1][mask_noshear_bin], w[mask_noshear_bin]) - weight_average(g_2m[:,1][mask_noshear_bin], w[mask_noshear_bin]))/dgamma
-R22s = (weight_average(g_noshear[:,1][mask_2p_bin], w[mask_2p_bin]) - weight_average(g_noshear[:,1][mask_2m_bin], w[mask_2m_bin]))/dgamma
-R11tot = R11+R11s
-R22tot = R22+R22s
+        else:
+            mask_1p_bin = (mask_1p==i+1)
+            mask_1m_bin = (mask_1m==i+1)
+            mask_2p_bin = (mask_2p==i+1)
+            mask_2m_bin = (mask_2m==i+1)
+            mask_noshear_bin = (mask_noshear==i+1)
+        del mask_1p, mask_1m, mask_2p, mask_2m, mask_noshear
 
-print('R11', R11, 'R11s', R11s)
-print('R22', R22, 'R22s', R22s)
-print('R11tot', R11tot, 'R22tot', R22tot)
+        g_noshear = h5r['mcal_g_noshear'][:]
+        w_1p = h5r['mcal_g_w_1p'][:]
+        w_1m = h5r['mcal_g_w_1m'][:]
+        w_2p = h5r['mcal_g_w_2p'][:]
+        w_2m = h5r['mcal_g_w_2m'][:]
+    R11s = (weight_average(g_noshear[:,0][mask_1p_bin], w_1p[mask_1p_bin]) - weight_average(g_noshear[:,0][mask_1m_bin], w_1m[mask_1m_bin]))/dgamma
+    R22s = (weight_average(g_noshear[:,1][mask_2p_bin], w_2p[mask_2p_bin]) - weight_average(g_noshear[:,1][mask_2m_bin], w_2m[mask_2m_bin]))/dgamma
 
-R_11.append(R11)
-R_11s.append(R11s)
-R_22.append(R22)
-R_22s.append(R22s)
-Ngal.append([len(w[mask_noshear_bin]), len(w[mask_1p_bin]), len(w[mask_1m_bin]), len(w[mask_2p_bin]), len(w[mask_2m_bin])])
-mean_e1.append(weight_average(g_noshear[:,0][mask_noshear_bin], w[mask_noshear_bin])/R11tot)
-mean_e2.append(weight_average(g_noshear[:,1][mask_noshear_bin], w[mask_noshear_bin])/R22tot)
+    del mask_1p_bin, mask_1m_bin, mask_2p_bin, mask_2m_bin, w_1p, w_1m, w_2p, w_2m
 
-print(np.mean(g_noshear[:,0][mask_noshear_bin])/R11tot)
-print(np.mean(g_noshear[:,1][mask_noshear_bin])/R22tot)
+    R11tot = R11+R11s
+    R22tot = R22+R22s
+                                                                      
+    print('R11', R11, 'R11s', R11s)
+    print('R22', R22, 'R22s', R22s)
+    print('R11tot', R11tot, 'R22tot', R22tot)
 
-del g_noshear, g_1p, g_1m, g_2p, g_2m
+    R_11.append(R11)
+    R_11s.append(R11s)
+    R_22.append(R22)
+    R_22s.append(R22s)
+    mean_e1.append(weight_average(g_noshear[:,0][mask_noshear_bin], w_noshear[mask_noshear_bin])/R11tot)
+    mean_e2.append(weight_average(g_noshear[:,1][mask_noshear_bin], w_noshear[mask_noshear_bin])/R22tot)
+    print(np.mean(g_noshear[:,0][mask_noshear_bin])/R11tot)
+    print(np.mean(g_noshear[:,1][mask_noshear_bin])/R22tot)
+
+    del g_noshear, w_noshear, mask_noshear_bin
+
+print('read shear')
+
 
 # get area ###########################
 
@@ -129,14 +125,15 @@ with h5py.File(master_cat, 'r') as h5r:
     ra = h5r['RA'][:]
     dec = h5r['DEC'][:]
     g1, g2  = h5r['mcal_g_noshear'][:].T
-    w = h5r['mcal_g_w'][:]
+    w_noshear = h5r['mcal_g_w_noshear'][:]
+    mask_noshear = h5r['baseline_mcal_mask_noshear'][:]
 
 mask_noshear_nontomo = (mask_noshear>0)
 ra = ra[mask_noshear_nontomo]
 dec = dec[mask_noshear_nontomo]
 g1 = g1[mask_noshear_nontomo]
 g2 = g2[mask_noshear_nontomo]
-w = w[mask_noshear_nontomo]
+w = w_noshear[mask_noshear_nontomo]
 
 nside = 4096
 map_counts = np.zeros(hp.nside2npix(nside))
@@ -157,7 +154,7 @@ print('total number', len(ra))
 print(len(ra)/area)
 n = len(ra)/area
 
-del ra, dec, g1, g2, w, pix, theta, phi
+del ra, dec, g1, g2, pix, theta, phi
 
 mask_all = map_counts.copy()
 mask_all[mask_all>0] = 1
@@ -215,83 +212,43 @@ Neff_C13 = []
 Sigmae_C13 = []
 N = []
 
-if tomo==1:
-    for i in range(4):
+for i in range(5):
+    if i==4:
+        mask_noshear_bin = (mask_noshear>0)
+    else:
         mask_noshear_bin = (mask_noshear==i+1)
            
-        mcal_g_cov_bin = mcal_g_cov[mask_noshear_bin]
-        g1_bin = g1[mask_noshear_bin]
-        g2_bin = g2[mask_noshear_bin]
-        w_bin = w[mask_noshear_bin]
+    mcal_g_cov_bin = mcal_g_cov[mask_noshear_bin]
+    g1_bin = g1[mask_noshear_bin]
+    g2_bin = g2[mask_noshear_bin]
+    w_bin = w_noshear[mask_noshear_bin]
                                     
-        sigma2_e1_m = mcal_g_cov_bin[:,0,0] 
-        sigma2_e2_m = mcal_g_cov_bin[:,1,1]
+    sigma2_e1_m = mcal_g_cov_bin[:,0,0] 
+    sigma2_e2_m = mcal_g_cov_bin[:,1,1]
     
-        R11tot = R_11[i]+R_11s[i]
-        R22tot = R_22[i]+R_22s[i]
+    R11tot = R_11[i]+R_11s[i]
+    R22tot = R_22[i]+R_22s[i]
                                    
-        neff_H12_bin = neff_H12(w_bin, area)
-        sigmae_H12_bin = sigmae_H12(w_bin, g1_bin, R11tot, g2_bin, R22tot, neff_H12_bin, area)
+    neff_H12_bin = neff_H12(w_bin, area)
+    sigmae_H12_bin = sigmae_H12(w_bin, g1_bin, R11tot, g2_bin, R22tot, neff_H12_bin, area)
                                                                     
-        sigmae_C13_bin = sigmae_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
-        neff_C13_bin = neff_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area, sigmae_C13_bin)
-                                                                                
-        print("bin"+str(i), neff_H12_bin, sigmae_H12_bin, neff_C13_bin, sigmae_C13_bin)
+    sigmae_C13_bin = sigmae_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
+    neff_C13_bin = neff_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area, sigmae_C13_bin)
     
-        Neff_H12.append(neff_H12_bin)
-        Neff_C13.append(neff_C13_bin)
-        Sigmae_H12.append(sigmae_H12_bin)
-        Sigmae_C13.append(sigmae_C13_bin)
-        N.append(len(w_bin)/area/60/60)
-
-        #np.savez('temp_'+str(i)+'.npz', w_bin=w_bin, g1_bin=g1_bin, R11_tot=R11_tot, g2_bin=g2_bin, R22tot=R22tot, 
-        #         sigma2_e1_m=sigma2_e1_m, sigma2_e2_m=sigma2_e2_m, area=area, simgae_C13_bin=sigmae_C)
-
-
-# non-tomographic
-
-mask_noshear_bin = (mask_noshear>0)
-
-mcal_g_cov_bin = mcal_g_cov[mask_noshear_bin]
-g1_bin = g1[mask_noshear_bin]
-g2_bin = g2[mask_noshear_bin]
-w_bin = w[mask_noshear_bin]
-
-sigma2_e1_m = mcal_g_cov_bin[:,0,0] 
-sigma2_e2_m = mcal_g_cov_bin[:,1,1]
-
-if tomo==1:
-    R11tot = R_11[4]+R_11s[4]
-    R22tot = R_22[4]+R_22s[4]
-else:
-    R11tot = R_11[0]+R_11s[0]
-    R22tot = R_22[0]+R_22s[0]
-
-
-neff_H12_bin = neff_H12(w_bin, area)
-sigmae_H12_bin = sigmae_H12(w_bin, g1_bin, R11tot, g2_bin, R22tot, neff_H12_bin, area)
-
-#sigmae_C13_bin = sigmae_C13_GS20(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
-#neff_C13_bin = neff_C13_GS20(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area, sigmae_C13_bin)
-
-sigmae_C13_bin = sigmae_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m)
-neff_C13_bin = neff_C13_C24(w_bin, g1_bin, R11tot, g2_bin, R22tot, sigma2_e1_m, sigma2_e2_m, area, sigmae_C13_bin)
-
-
-print("non-tomo", neff_H12_bin, sigmae_H12_bin, neff_C13_bin, sigmae_C13_bin)
-
-Neff_H12.append(neff_H12_bin)
-Neff_C13.append(neff_C13_bin)
-Sigmae_H12.append(sigmae_H12_bin)
-Sigmae_C13.append(sigmae_C13_bin)
-N.append(len(w_bin)/area/60/60)
-
-if tomo==1:
-    NN=5
-else: 
-    NN=1
+    if i==4:
+        print('non-tomo')
+    else:
+        print("bin"+str(i))
     
-for i in range(NN):
+    print(neff_H12_bin, sigmae_H12_bin, neff_C13_bin, sigmae_C13_bin)
+    
+    Neff_H12.append(neff_H12_bin)
+    Neff_C13.append(neff_C13_bin)
+    Sigmae_H12.append(sigmae_H12_bin)
+    Sigmae_C13.append(sigmae_C13_bin)
+    N.append(len(w_bin)/area/60/60)
+    
+for i in range(5):
     print("%.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.3f & %.5f & %.5f " 
     % (N[i]*60*60, R_11[i], R_11s[i], R_11[i]+R_11s[i], R_22[i], R_22s[i], R_22[i]+R_22s[i], Neff_C13[i], Sigmae_C13[i], Neff_H12[i], Sigmae_H12[i], mean_e1[i], mean_e2[i]))
 
