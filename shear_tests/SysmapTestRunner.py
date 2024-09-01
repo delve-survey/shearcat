@@ -84,7 +84,11 @@ class SysmapTestRunner:
             del ra, dec; gc.collect()
             
             
-            w   = f['mcal_g_w'][::]
+            w   = f['mcal_g_w_noshear'][::]
+            w1p = f['mcal_g_w_1p'][::]
+            w1m = f['mcal_g_w_1m'][::]
+            w2p = f['mcal_g_w_2p'][::]
+            w2m = f['mcal_g_w_2m'][::]
             
             g   = f['mcal_g_noshear'][::]
             g1p = f['mcal_g_1p'][::]
@@ -97,11 +101,11 @@ class SysmapTestRunner:
             
         dgamma = 0.01*2
 
-        R11    = (self._pix_avg(pix[m], g1p[m, 0], w[m]) - self._pix_avg(pix[m], g1m[m, 0], w[m]))/dgamma
-        R11s   = (self._pix_avg(pix[m_1p], g[m_1p, 0], w[m_1p]) - self._pix_avg(pix[m_1m], g[m_1m, 0], w[m_1m]))/dgamma
+        R11    = (self._pix_avg(pix[m],    g1p[m, 0],  w[m])      - self._pix_avg(pix[m],    g1m[m, 0],  w[m]))/dgamma
+        R11s   = (self._pix_avg(pix[m_1p], g[m_1p, 0], w1p[m_1p]) - self._pix_avg(pix[m_1m], g[m_1m, 0], w1m[m_1m]))/dgamma
         
-        R22    = (self._pix_avg(pix[m], g2p[m, 1], w[m]) - self._pix_avg(pix[m], g2m[m, 1], w[m]))/dgamma
-        R22s   = (self._pix_avg(pix[m_2p], g[m_2p, 1], w[m_2p]) - self._pix_avg(pix[m_2m], g[m_2m, 1], w[m_2m]))/dgamma
+        R22    = (self._pix_avg(pix[m],    g2p[m, 1],  w[m])      - self._pix_avg(pix[m],    g2m[m, 1],  w[m]))/dgamma
+        R22s   = (self._pix_avg(pix[m_2p], g[m_2p, 1], w2p[m_2p]) - self._pix_avg(pix[m_2m], g[m_2m, 1], w2m[m_2m]))/dgamma
         
         
         R11tot = R11 + R11s
@@ -118,10 +122,10 @@ class SysmapTestRunner:
             
             mask = self.mask_condition(f['baseline_mcal_mask_noshear'][:])
 
-            ra = f['RA'][::][mask]
+            ra  = f['RA'][::][mask]
             dec = f['DEC'][::][mask]
-            g  = f['mcal_g_noshear'][::][mask]
-            w  = f['mcal_g_w'][::][mask]
+            g   = f['mcal_g_noshear'][::][mask]
+            w   = f['mcal_g_w_noshear'][::][mask]
             
             
         pix = hp.ang2pix(self.NSIDE, ra, dec, lonlat = True)
@@ -221,12 +225,12 @@ if __name__ == "__main__":
     maps  = ['airmass', 'dcr_e1', 'dcr_e2', 'dcr_ddec', 'dcr_dra', 'maglim',  'exptime', 'fwhm', 'skysigma', 'skybrite', 'nexp']
     bands = ['r', 'i', 'z']
 
-    # RUN   = SysmapTestRunner(NSIDE = 128, data_path = '/project/chihway/data/decade/metacal_gold_combined_20240209.hdf',)
-    # corr  = RUN.go(maps, bands)
-    # np.save('/home/dhayaa/DECADE/shearcat/shear_tests/Paper_plots/SysMapCorr_20240815.npy',     corr,  allow_pickle = True)
+    RUN   = SysmapTestRunner(NSIDE = 128, data_path = '/project/chihway/data/decade/metacal_gold_combined_20240209.hdf',)
+    corr  = RUN.go(maps, bands)
+    np.save('/home/dhayaa/DECADE/shearcat/shear_tests/Paper_plots/SysMapCorr_20240901.npy',     corr,  allow_pickle = True)
     
 
 
     RUN   = TomoSysmapTestRunner(NSIDE = 128, data_path = '/project/chihway/data/decade/metacal_gold_combined_20240209.hdf',)
     tcorr = RUN.go(maps, bands)
-    np.save('/home/dhayaa/DECADE/shearcat/shear_tests/Paper_plots/SysMapTomoCorr_20240815.npy', tcorr, allow_pickle = True)
+    np.save('/home/dhayaa/DECADE/shearcat/shear_tests/Paper_plots/SysMapTomoCorr_20240901.npy', tcorr, allow_pickle = True)
