@@ -11,6 +11,16 @@ import datetime as dt
 import io
 import subprocess as sp
 import argparse
+import threading, glob
+
+# select fai.path, fai.filename, i.band, i.expnum, i.ccdnum, z.mag_zero 
+# from 
+# image i, 
+# file_archive_info fai, 
+# (select distinct filename from MADAMOW_DECADE.DR3_R2_IMAGE_TO_TILE_V4) mi, 
+# madamow_decade.des_decade_refcat2_14_0 z 
+# where 
+# mi.filename = i.filename and fai.filename = i.filename and z.expnum = i.expnum and z.ccdnum = i.ccdnum; > Tilelist_DR3_2_20241007.csv
 
 def current_job_count():
 
@@ -35,22 +45,26 @@ def current_job_count():
 
     return count
 
+
+def current_wget_count():
+
+    j = glob.glob(os.path.expandvars("$EXP_DIR/tmp_filelist_batch*"))
+
+    return len(j)
+
+
+def download_and_launch(*args):
+
+    download(*args[:-1])
+
+    job = args[-1]
+    os.system('chmod u+x %s' % job)
+    os.system('sbatch %s' % job)
+
+    #Remove file once you submit to remove clutter
+    os.remove(job)
+
 if __name__ == '__main__':
-
-    my_parser = argparse.ArgumentParser()
-
-    my_parser.add_argument('--rank',     action='store', required = True, type = int)
-    my_parser.add_argument('--Nperrank', action='store', required = True, type = int)
-    my_parser.add_argument('--Nperjob',  action='store', required = True, type = int)
-
-    args = vars(my_parser.parse_args())
-
-    #Print args for debugging state
-    print('-------INPUT PARAMS----------')
-    for p in args.keys():
-        print('%s : %s'%(p.upper(), args[p]))
-    print('-----------------------------')
-    print('-----------------------------')
 
     #Automatically get folder name (assuming certain folder structure)
     name = os.path.basename(os.path.dirname(__file__))
@@ -68,10 +82,28 @@ if __name__ == '__main__':
 
     #Run just DR3_1_1 for now since we only have shear for that region
     #explist = '/home/dhayaa/Desktop/DECADE/DR3_1_2_DEC60_explist.csv'
-    explist = '/home/dhayaa/Desktop/DECADE/DR3_1_Remaining_explist.csv'
+    explist = '/home/dhayaa/Desktop/DECADE/DR3_2_20241007.csv'
     imgname = pd.read_csv(explist)
 
     imgname = imgname.drop_duplicates().sort_values('EXPNUM')
+    print("SIZE:", len(imgname))
+    print(imgname['BAND'].value_counts())
+
+
+    my_parser = argparse.ArgumentParser()
+
+    my_parser.add_argument('--rank',     action='store', required = True, type = int)
+    my_parser.add_argument('--Nperrank', action='store', default  = len(imgname), type = int)
+    my_parser.add_argument('--Nperjob',  action='store', required = True, type = int)
+
+    args = vars(my_parser.parse_args())
+
+    #Print args for debugging state
+    print('-------INPUT PARAMS----------')
+    for p in args.keys():
+        print('%s : %s'%(p.upper(), args[p]))
+    print('-----------------------------')
+    print('-----------------------------')
 
     N_exp = args['Nperrank']
     N_per_job = args['Nperjob']
@@ -94,7 +126,8 @@ if __name__ == '__main__':
 
         while (dt.datetime.now() - start_time).seconds < np.inf: #FORCE IT INTO LOOP
 
-            if current_job_count() >= 4:
+            Nmax = 30
+            if (current_job_count() >= Nmax) | (current_wget_count() >= Nmax):
 
                 print("---------------------------")
                 print(dt.datetime.now())
@@ -103,18 +136,29 @@ if __name__ == '__main__':
 
             else:
 
-                flist = os.environ['EXP_DIR'] + '/tmp_filelist_rank%d.txt'%args['rank']
+                flist = os.environ['EXP_DIR'] + f'/tmp_filelist_batch{n}_rank{args["rank"]}.txt'
                 job   = './job_batch%d_rank%d.txt'%(n,args['rank'])
-                download(imgname.PATH.values[start:end], os.environ['EXP_DIR'], imgname.FILENAME.values[start:end], flist)
 
                 with open(job, 'w') as fp:
                     fp.write(tmp.render(start = start, end = end, path_to_explist = explist, seed = 42))
 
-                os.system('chmod u+x %s' % job)
-                os.system('sbatch %s' % job)
+                t = threading.Thread(target = download_and_launch,
+                                     args = (imgname.PATH.values[start:end], 
+                                            os.environ['EXP_DIR'], 
+                                            imgname.FILENAME.values[start:end], 
+                                            flist,
+                                            job)
+                                    ).start()
+                
+                print("====================================")
+                print(f"DONE STARTING DOWNLOAD {n}")
+                print("====================================")
+                # download(imgname.PATH.values[start:end], os.environ['EXP_DIR'], imgname.FILENAME.values[start:end], flist)
 
-                #Remove file once you submit to remove clutter
-                os.remove(job)
+                
+                # os.system('chmod u+x %s' % job)
+                # os.system('sbatch %s' % job)
+
 
                 #Now break out of the loop
                 break
