@@ -45,6 +45,8 @@ class AllTests(object):
         self.Star_SNR_min = Star_SNR_min
         self.MapNSIDE_weightrands = MapNSIDE_weightrands
 
+        self.rng = np.random.default_rng(seed = 42)
+        
         self.psf_inds, self.gal_inds = self.define_patches()
 
         self.output_path = output_path
@@ -55,6 +57,7 @@ class AllTests(object):
         #self.dered = ''
 
 
+
     @timeit
     def define_patches(self):
 
@@ -62,8 +65,8 @@ class AllTests(object):
         with h5py.File(self.galaxy_cat, 'r') as f:
             RA, DEC = f['RA'][:][self.galaxy_cat_inds], f['DEC'][:][self.galaxy_cat_inds]
 
-        S = int(RA.size/5_000_000)
-        centers  = treecorr.Catalog(ra = RA[::S], dec = DEC[::S], ra_units='deg',dec_units='deg', npatch = self.Npatch)._centers
+        S = self.rng.choice(RA.size, size = 5_000_000, replace = False)
+        centers  = treecorr.Catalog(ra = RA[S], dec = DEC[S], ra_units='deg',dec_units='deg', npatch = self.Npatch)._centers
         gal_inds = treecorr.Catalog(ra = RA, dec = DEC, ra_units='deg',dec_units='deg', patch_centers = centers)._patch
         
         
@@ -954,7 +957,7 @@ class AllTests(object):
             ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
             dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
             w   = f['mcal_g_w_noshear'][:][self.galaxy_cat_inds][Mask]
-            g1, g2  = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
+            g1, g2 = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
             
              #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
             for a in [g1, g2]:
@@ -991,7 +994,7 @@ class AllTests(object):
         
         
         #Process Matt's real-space E/B estimator
-        X = self.MRBmodeRunner(T, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        X = self.MRBmodeRunner(T, theta_min = 2.5, theta_max = 250, Ntheta = 250, Nmodes = 40)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_treecorr.txt'))
         np.save(self.output_path + '/MRBmode_E.npy', E)
@@ -1343,37 +1346,37 @@ class AllTests(object):
         ########################################################################################################################
 
         #Process Matt's real-space E/B estimator
-        X = self.MRBmodeRunner(cat_e, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        X = self.MRBmodeRunner(cat_e, theta_min = 2.5, theta_max = 250, Ntheta = 100, Nmodes = 20)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_EE_treecorr.txt'))
         custom_write('EE', E, B, cov_E, cov_B)
         
         
-        X = self.MRBmodeRunner(cat_q, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        X = self.MRBmodeRunner(cat_q, theta_min = 2.5, theta_max = 250, Ntheta = 100, Nmodes = 20)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_QQ_treecorr.txt'))
         custom_write('QQ', E, B, cov_E, cov_B)
         
         
-        X = self.MRBmodeRunner(cat_e, cat_q, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        X = self.MRBmodeRunner(cat_e, cat_q, theta_min = 2.5, theta_max = 250, Ntheta = 100, Nmodes = 20)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_EQ_treecorr.txt'))
         custom_write('EQ', E, B, cov_E, cov_B)
         
         
-        X = self.MRBmodeRunner(cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        X = self.MRBmodeRunner(cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 100, Nmodes = 20)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_WW_treecorr.txt'))
         custom_write('WW', E, B, cov_E, cov_B)
         
         
-        X = self.MRBmodeRunner(cat_q, cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        X = self.MRBmodeRunner(cat_q, cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 100, Nmodes = 20)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_QW_treecorr.txt'))
         custom_write('QW', E, B, cov_E, cov_B)
         
         
-        X = self.MRBmodeRunner(cat_e, cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 1000, Nmodes = 20)
+        X = self.MRBmodeRunner(cat_e, cat_w, theta_min = 2.5, theta_max = 250, Ntheta = 100, Nmodes = 20)
         E, B, cov_E, cov_B, corr = X.compute_EB()
         corr.write(os.path.join(self.output_path, 'MRBmode_EW_treecorr.txt'))
         custom_write('EW', E, B, cov_E, cov_B)
