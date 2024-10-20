@@ -33,7 +33,7 @@ class AllTests(object):
 
 
     def __init__(self, psf_cat, galaxy_cat, psf_cat_inds, galaxy_cat_inds, output_path, sim_Cls_path, 
-                 Npatch = 100, Star_SNR_min = 80, MapNSIDE_weightrands = 256):
+                 Npatch = 100, Star_SNR_min = 80, MapNSIDE_weightrands = 256, tomobin = -99):
         
         self.psf_cat    = psf_cat
         self.galaxy_cat = galaxy_cat
@@ -55,6 +55,8 @@ class AllTests(object):
         
         self.dered = '_dered_sfd98'
         #self.dered = ''
+        
+        self.tomobin = tomobin
 
 
 
@@ -261,6 +263,10 @@ class AllTests(object):
                 T       = f[f'mcal_T_{label}'][:][self.galaxy_cat_inds]
                 flags   = f['mcal_flags'][:][self.galaxy_cat_inds]
                 
+                if self.tomobin > 0:
+                    
+                    tomo = f[f'baseline_mcal_mask_{label}'][:][self.galaxy_cat_inds]
+                
             # We don't use any of the area-based cuts, as the expectations is to include them
             # in the indices that are passed in.
 
@@ -280,8 +286,13 @@ class AllTests(object):
                               (-1.5 < mag_r - mag_i) & (mag_r - mag_i < 4) & 
                               (-1.5 < mag_i - mag_z) & (mag_i - mag_z < 4)
                              )
+                
+                if self.tomobin > 0: 
+                    Tomo_Mask = tomo == self.tomobin
+                else:
+                    Tomo_Mask = True
 
-            Mask = SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Color_Mask & Other_Mask
+            Mask = SNR_Mask & Tratio_Mask & T_Mask & Flag_Mask & Color_Mask & Other_Mask & Tomo_Mask
             
             np.save(os.environ['TMPDIR'] + '/MASK_%s.npy' % label, Mask)
 
@@ -945,6 +956,38 @@ class AllTests(object):
     @timeit
     def Bmodes(self):
 
+        Mask = self.get_mcal_Mask('noshear')
+
+        #Load the shape catalog
+        with h5py.File(self.galaxy_cat, 'r') as f:
+
+            ra  = f['RA'][:][self.galaxy_cat_inds][Mask]
+            dec = f['DEC'][:][self.galaxy_cat_inds][Mask]
+            w   = f['mcal_g_w_noshear'][:][self.galaxy_cat_inds][Mask]
+            g1, g2 = f['mcal_g_noshear'][:][self.galaxy_cat_inds][Mask].T
+            
+             #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
+            for a in [g1, g2]:
+                a -= np.average(a, weights = w)
+
+        R11, R22 = self.compute_response(np.ones_like(Mask).astype(bool))
+        g1, g2 = g1/R11, g2/R22
+
+        T = treecorr.Catalog(g1 = g1[::], g2 = g2[::], ra = ra[::], dec = dec[::], w = w[::], 
+                             ra_units='deg', dec_units='deg', npatch = self.Npatch)        
+        
+        #Process Matt's real-space E/B estimator
+        X = self.MRBmodeRunner(T, theta_min = 2.5, theta_max = 250, Ntheta = 250, Nmodes = 40)
+        E, B, cov_E, cov_B, corr = X.compute_EB()
+        corr.write(os.path.join(self.output_path, 'MRBmode_treecorr.txt'))
+        np.save(self.output_path + '/MRBmode_E.npy', E)
+        np.save(self.output_path + '/MRBmode_B.npy', B)
+        np.save(self.output_path + '/MRBmode_E_Cov.npy', cov_E)
+        np.save(self.output_path + '/MRBmode_B_Cov.npy', cov_B)
+        
+        
+    @timeit
+    def Bmodes_Namaster(self):
 
         nside = 1024
         npix  = hp.nside2npix(nside)
@@ -967,41 +1010,31 @@ class AllTests(object):
         g1, g2 = g1/R11, g2/R22
 
         #Need a -1 for g2 in R (not T) due to Namaster definition
-        T = treecorr.Catalog(g1 = g1[::], g2 = g2[::], ra = ra[::], dec = dec[::], w = w[::], ra_units='deg', dec_units='deg', npatch = self.Npatch)
-        #R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = -g2, w = w, NSIDE = nside); del ra, dec, g1, g2
-        #C = self.MakeMapFromCls(self.sim_Cls, NSIDE = nside)
+        R = self.MakeMapFromCat(ra = ra, dec = dec, e1 = g1, e2 = -g2, w = w, NSIDE = nside); del ra, dec, g1, g2
+        # C = self.MakeMapFromCls(self.sim_Cls, NSIDE = nside)
+        C = None
         
         
         ##############################################
         # No harmonic-space Bmodes in this test
         ##############################################
-        ##Process regular Bmodes
-        #X    = self.BmodeRunner(R, C, 42, njobs = 1)
-        #data = X.process_data()
-        #Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
-        #
-        #np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
-        #np.save(self.output_path + '/Bmode_Noise.npy', Cov)
-        #
-        #
-        ##Process pure Bmodes
-        #X    = self.PureBmodeRunner(R, C, 42, njobs = 1)
-        #data = X.process_data()
-        #Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
+        #Process regular Bmodes
+        X    = self.BmodeRunner(R, C, 42, njobs = 1)
+        data = X.process_data()
+        Cov  = X.process_noise(500) #Make a lot more sims so we dont get hit by Hartlap factor
+        
+        np.save(self.output_path + '/Bmode.npy', np.vstack([data,  X.ell_eff]))
+        np.save(self.output_path + '/Bmode_Noise.npy', Cov)
+        
+        
+        #Process pure Bmodes
+#         X    = self.PureBmodeRunner(R, C, 42, njobs = 1)
+#         data = X.process_data()
+#         Cov  = X.process_noise(100) #Make a lot more sims so we dont get hit by Hartlap factor
 
-        #np.save(self.output_path + '/PureBmode.npy', np.vstack([data,  X.ell_eff]))
-        #np.save(self.output_path + '/PureBmode_Noise.npy', Cov)
-        
-        
-        #Process Matt's real-space E/B estimator
-        X = self.MRBmodeRunner(T, theta_min = 2.5, theta_max = 250, Ntheta = 250, Nmodes = 40)
-        E, B, cov_E, cov_B, corr = X.compute_EB()
-        corr.write(os.path.join(self.output_path, 'MRBmode_treecorr.txt'))
-        np.save(self.output_path + '/MRBmode_E.npy', E)
-        np.save(self.output_path + '/MRBmode_B.npy', B)
-        np.save(self.output_path + '/MRBmode_E_Cov.npy', cov_E)
-        np.save(self.output_path + '/MRBmode_B_Cov.npy', cov_B)
-        
+#         np.save(self.output_path + '/PureBmode.npy', np.vstack([data,  X.ell_eff]))
+#         np.save(self.output_path + '/PureBmode_Noise.npy', Cov)
+                
 
     @timeit
     def rho_stats(self):
@@ -1631,21 +1664,19 @@ class AllTests(object):
             self.unique_pix, self.idx_rep = np.unique(self.pix, return_inverse=True)
             del ra, dec
             
-            self.n_map = np.zeros(hp.nside2npix(self.NSIDE))
-            self.n_map[self.unique_pix] += np.bincount(self.idx_rep, weights = w)
+            self.n_map = np.bincount(self.pix, minlength = hp.nside2npix(self.NSIDE))
             
             if w is None:
                 
                 self.weight_map = np.ones_like(self.n_map)
             else:
-                self.weight_map = self.n_map.copy()
+                self.weight_map = np.bincount(self.pix, weights = w, minlength = hp.nside2npix(self.NSIDE))
                 #self.weight_map[self.unique_pix] /= np.bincount(self.idx_rep) #Get mean weight per pixel
                 
                 
             #Only select pixels where we have at least a single galaxy
             #Rest will have zero ellipticity by default
             self.mask_sims = self.n_map != 0.
-
             
             if w is None: w = 1
             
@@ -1734,7 +1765,7 @@ class AllTests(object):
             
             self.seed    = seed
             self.njobs   = njobs
-            self.mask    = MakeMapFromCat.mask_sims #* MakeMapFromCat.weight_map #We don't use weights since it gets kinda weird
+            self.mask    = MakeMapFromCat.mask_sims * MakeMapFromCat.weight_map #We don't use weights since it gets kinda weird
             
             self.bins    = bins
             self.bins    = nmt.NmtBin.from_edges(self.bins[:-1], self.bins[1:])
@@ -1943,6 +1974,7 @@ if __name__ == '__main__':
     my_parser.add_argument('--galaxy_cat_inds', action='store', type = str, required = True)
     my_parser.add_argument('--output_path',     action='store', type = str, required = True)
     my_parser.add_argument('--sim_Cls_path',    action='store', type = str, required = True)
+    my_parser.add_argument('--tomobin',         action='store', type = int, default  = -99)
     
     
     my_parser.add_argument('--Npatch',       action='store', type = int, default = 150)
@@ -1960,13 +1992,13 @@ if __name__ == '__main__':
     my_parser.add_argument('--rho_stats',        action='store_true', default = False)
     my_parser.add_argument('--psf_color',        action='store_true', default = False)
     my_parser.add_argument('--Bmodes',           action='store_true', default = False)
+    my_parser.add_argument('--Bmodes_Namaster',  action='store_true', default = False)
     my_parser.add_argument('--MRBmode_psf',      action='store_true', default = False)
     my_parser.add_argument('--check_shear_2pt',  action='store_true', default = False)
     
     
     args  = vars(my_parser.parse_args())
-    cargs = {k:args[k] for k in list(args.keys())[:9]}
-    
+    cargs = {k:args[k] for k in list(args.keys())[:10]}
     
     RUNNER = AllTests(**cargs)
     
@@ -1979,6 +2011,7 @@ if __name__ == '__main__':
     if np.logical_or(args['All'], args['rho_stats']):        RUNNER.rho_stats()
     if np.logical_or(args['All'], args['psf_color']):        RUNNER.psf_color()
     if np.logical_or(args['All'], args['Bmodes']):           RUNNER.Bmodes()
+    if np.logical_or(args['All'], args['Bmodes_Namaster']):  RUNNER.Bmodes_Namaster()
     
     
     if args['MRBmode_psf']:      RUNNER.MRBmode_psf() #This takes really long time so we run it separately, always!
