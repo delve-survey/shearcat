@@ -3,6 +3,7 @@ import healpy as hp
 import h5py, gc, glob, yaml
 import treecorr
 from tqdm import tqdm
+from numba import njit
 
 import sys, os, subprocess as sp
 sys.path.append('/home/dhayaa/DECADE/')
@@ -26,6 +27,16 @@ def timed_execution(Name):
     print(f"Finished task {Name} in {elapsed_time:.4f} seconds")
     print("===================================================\n")
 
+def timeit(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        total_time = end_time - start_time
+        print(f"Function {func.__name__} took {total_time:.5} seconds to run.")
+        return result
+    return wrapper
+
 
 def parallelize(func):
     @wraps(func)
@@ -41,7 +52,7 @@ def parallelize(func):
         
         return results
     
-    return wrapper
+    return wrapper  
 
 @parallelize
 def my_map2alm(array): return hp.map2alm(array, use_pixel_weights = True)
@@ -54,8 +65,6 @@ def my_rotate_alm(array, angles): return hp.rotator.Rotator(angles, deg = True).
 
 @parallelize
 def my_ud_grade(array, NSIDE): return hp.ud_grade(array, NSIDE)
-
-
 
 @parallelize
 def my_klm_to_rotated_shear(array, angles, NSIDE):
@@ -72,17 +81,38 @@ def my_klm_to_rotated_shear(array, angles, NSIDE):
     return hp.alm2map([dummy, alms, dummy], nside = NSIDE, pol = True)[1:] 
 
 
-def corrs2format(corrs): return np.concatenate([c.xip for c in corrs] + [c.xim for c in corrs])
+def gen_samples(g, g_cov, rng):
+    
+    @njit
+    def _gen_samples(g, g_cov, rng):
+        
+        res = np.zeros_like(g)
+        
+        for i in range(g.shape[0]):
+            
+            L = np.linalg.cholesky(g_cov[i])
+            z = rng.normal(0, 1, g[i].shape)
+            res[i] = g[i] + np.dot(L, z)
+            
+        return res
+    
+    N_cpu       = os.cpu_count()
+    seeds       = rng.integers(2**20, size = N_cpu)
+    N_per_batch = int(np.ceil(g.shape[0] / N_cpu))
 
-def timeit(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        total_time = end_time - start_time
-        print(f"Function {func.__name__} took {total_time:.5} seconds to run.")
-        return result
-    return wrapper
+    def one_process(i):
+        s, e = N_per_batch * i, N_per_batch * (i + 1)
+        return _gen_samples(g[s:e], g_cov[s:e], np.random.default_rng(seed = seeds[i]))
+    
+    results = joblib.Parallel(n_jobs = N_cpu, verbose = 10)(joblib.delayed(one_process)(i) for i in range(N_cpu))
+
+    s = 0
+    for r in results:
+        s += len(r)
+    return np.concatenate(results, axis = 0)
+
+
+def corrs2format(corrs): return np.concatenate([c.xip for c in corrs] + [c.xim for c in corrs])
 
 rots_per_map = 4
 
@@ -182,13 +212,14 @@ class BaseRunner:
     map_globpath = None
     NSIDE        = 1024
 
-    def __init__(self, seed, Npatch = 100, homogenize = False, nonoise = False):
+    def __init__(self, seed, Npatch = 100, homogenize = False, nonoise = False, measurementnoise = False):
 
         self.seed       = seed
         self.rng        = np.random.default_rng(seed)
         self.Npatch     = Npatch
         self.homogenize = homogenize
         self.nonoise    = nonoise
+        self.measurementnoise = measurementnoise
 
 
     def load_catalog(self):
@@ -196,6 +227,7 @@ class BaseRunner:
         cat = {}
         with h5py.File(self.catalog_path, 'r') as f:
             g1, g2 = f['mcal_g_noshear'][:].T
+            g_cov  = f['mcal_g_cov_noshear'][:]
             ra     = f['RA'][:]
             dec    = f['DEC'][:]
             w      = f['mcal_g_w'][:]
@@ -219,6 +251,7 @@ class BaseRunner:
             patch = treecorr.Catalog(ra = ra[inds], dec = dec[inds], ra_units='deg', dec_units='deg', patch_centers = centers)._patch
             cat = { 'g1'    : g1[inds] / R[0], 
                     'g2'    : g2[inds] / R[1], 
+                    'g_cov' : g_cov[inds] / np.array([[R[0]**2, R[0]*R[1]], [R[0]*R[1], R[1]**2]])[None, ...],
                     'w'     : w[inds],
                     'hpix'  : hp.ang2pix(self.NSIDE, ra[inds], dec[inds], lonlat = True),
                     'ra'    : ra[inds],
@@ -392,7 +425,12 @@ class BaseRunner:
             
             corr_res = []
 
-            g1_cat, g2_cat = self.rotate_shear(cat['g1'], cat['g2'], self.rng.integers(2**30))               
+            if self.measurementnoise:
+                g1_cat, g2_cat = gen_samples(np.array([cat['g1'], cat['g2']]).T, cat['g_cov'], self.rng).T
+            else:
+                g1_cat, g2_cat = cat['g1'], cat['g2']
+
+            g1_cat, g2_cat = self.rotate_shear(g1_cat, g2_cat, self.rng.integers(2**30))               
             g1_sim, g2_sim = self.simulated_shears(cat['hpix'], g[0], g[1])
 
             g1_cat, g2_cat = g1_cat + g1_sim, g2_cat + g2_sim
@@ -497,12 +535,15 @@ if __name__ == "__main__":
     my_parser.add_argument('--DELVE',    action='store_true')
     my_parser.add_argument('--DES',      action='store_true')
     my_parser.add_argument('--homogenize', action='store_true')
+    my_parser.add_argument('--measurementnoise', action='store_true')
     
     args = vars(my_parser.parse_args())
 
     assert args['DES'] + args['DELVE'] != 2, "You can only use --DELVE or --DES, not both"
 
     if args['DELVE']:
-        res = DELVERunner(seed = args['seed'], Npatch = args['Npatch'], homogenize = args['homogenize']).process(N_i = args['Nind'])
+        res = DELVERunner(seed = args['seed'], Npatch = args['Npatch'], 
+                          homogenize = args['homogenize'],
+                          measurementnoise = args['measurementnoise']).process(N_i = args['Nind'])
         res = {'E': res[0], 'B': res[1], 'cov_E': res[2], 'cov_B': res[3], 'corr': res[4]}
         np.save(OUTPATH + f"/{args['Name']}.npy", res, allow_pickle = True)
