@@ -1114,6 +1114,11 @@ class AllTests(object):
         g2_model = g2_model[Mask]
         del pix
 
+        #Quickfix just for tomobin runs:
+        if 'tomobin' in self.output_path:
+            print("DOING TOMOGRAPHIC VERSION. NOT USING STAR WEIGHTS")
+            psf_w = np.ones_like(psf_w)
+
         print("LOADED EVERYTHING")
 
         #Do mean subtraction, following Gatti+ 2020: https://arxiv.org/pdf/2011.03408.pdf
@@ -1667,7 +1672,6 @@ class AllTests(object):
             self.n_map = np.bincount(self.pix, minlength = hp.nside2npix(self.NSIDE))
             
             if w is None:
-                
                 self.weight_map = np.ones_like(self.n_map)
             else:
                 self.weight_map = np.bincount(self.pix, weights = w, minlength = hp.nside2npix(self.NSIDE))
@@ -1699,10 +1703,11 @@ class AllTests(object):
                 e1, e2    = self.rotate_ellipticities(self.e1, self.e2, rot_angle)
             
             #Math for getting the weighted shape average per pixel
-            e1_map[self.unique_pix] += np.bincount(self.idx_rep, weights = e1 * self.w)
-            e2_map[self.unique_pix] += np.bincount(self.idx_rep, weights = e2 * self.w)
-            e1_map[self.mask_sims]   = e1_map[self.mask_sims]/(self.n_map[self.mask_sims])
-            e2_map[self.mask_sims]   = e2_map[self.mask_sims]/(self.n_map[self.mask_sims])
+            e1_map = np.bincount(self.pix, weights = e1 * self.w, minlength = hp.nside2npix(self.NSIDE))
+            e2_map = np.bincount(self.pix, weights = e2 * self.w, minlength = hp.nside2npix(self.NSIDE))
+            n_map  = np.bincount(self.pix, weights = self.w,      minlength = hp.nside2npix(self.NSIDE))
+            e1_map[self.mask_sims] = e1_map[self.mask_sims]/(n_map[self.mask_sims])
+            e2_map[self.mask_sims] = e2_map[self.mask_sims]/(n_map[self.mask_sims])
             
             return e1_map, e2_map
         

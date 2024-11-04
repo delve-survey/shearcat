@@ -71,8 +71,10 @@ class BmodeTomo(object):
             R22tot = (np.average(f['mcal_g_2p'][:][:, 1][Mask2p],  weights = f['mcal_g_w_2p'][:][:][Mask2p]) - 
                       np.average(f['mcal_g_2m'][:][:, 1][Mask2m],  weights = f['mcal_g_w_2m'][:][:][Mask2m]))/dgamma
             
+        print("BIN", bin, R11tot, R22tot)
         return R11tot, R22tot
 
+    
     @timeit
     def Bmodes_Namaster(self):
 
@@ -142,12 +144,9 @@ class BmodeTomo(object):
             self.n_map = np.bincount(self.pix, minlength = hp.nside2npix(self.NSIDE))
             
             if w is None:
-                
                 self.weight_map = np.ones_like(self.n_map)
             else:
                 self.weight_map = np.bincount(self.pix, weights = w, minlength = hp.nside2npix(self.NSIDE))
-                #self.weight_map[self.unique_pix] /= np.bincount(self.idx_rep) #Get mean weight per pixel
-                
                 
             #Only select pixels where we have at least a single galaxy
             #Rest will have zero ellipticity by default
@@ -156,7 +155,6 @@ class BmodeTomo(object):
             if w is None: w = 1
             
             self.w = w
-            
             
             self.e1 = e1
             self.e2 = e2
@@ -174,10 +172,11 @@ class BmodeTomo(object):
                 e1, e2    = self.rotate_ellipticities(self.e1, self.e2, rot_angle)
             
             #Math for getting the weighted shape average per pixel
-            e1_map[self.unique_pix] += np.bincount(self.idx_rep, weights = e1 * self.w)
-            e2_map[self.unique_pix] += np.bincount(self.idx_rep, weights = e2 * self.w)
-            e1_map[self.mask_sims]   = e1_map[self.mask_sims]/(self.n_map[self.mask_sims])
-            e2_map[self.mask_sims]   = e2_map[self.mask_sims]/(self.n_map[self.mask_sims])
+            e1_map = np.bincount(self.pix, weights = e1 * self.w, minlength = hp.nside2npix(self.NSIDE))
+            e2_map = np.bincount(self.pix, weights = e2 * self.w, minlength = hp.nside2npix(self.NSIDE))
+            n_map  = np.bincount(self.pix, weights = self.w,      minlength = hp.nside2npix(self.NSIDE))
+            e1_map[self.mask_sims] = e1_map[self.mask_sims]/(n_map[self.mask_sims])
+            e2_map[self.mask_sims] = e2_map[self.mask_sims]/(n_map[self.mask_sims])
             
             return e1_map, e2_map
         
@@ -247,8 +246,9 @@ class BmodeTomo(object):
             self.ell_eff = self.bins.get_effective_ells()
 
             self.mask    = [X.mask_sims * X.weight_map for X in Catalogs] #We don't use weights since it gets kinda weird
+            self.mask    = [X.mask_sims.copy() for X in Catalogs] #We don't use weights since it gets kinda weird
             
-            w = [[0] * self.Nbins] * self.Nbins
+            w = [[0 for _ in range(self.Nbins)] for _ in range(self.Nbins)]
 
             for i in range(self.Nbins):
                 for j in range(i, self.Nbins):
@@ -265,7 +265,7 @@ class BmodeTomo(object):
         def process_data(self):
             
             RES  = [[0 for _ in range(self.Nbins)] for _ in range(self.Nbins)]
-            TMP  = [self.Catalogs[i].process(-np.inf, norand = True) for i in range(self.Nbins)]
+            TMP  = [self.Catalogs[i].process(-np.inf, norand = True)   for i in range(self.Nbins)]
             DATA = [nmt.NmtField(self.mask[i], [TMP[i][0], TMP[i][1]]) for i in range(self.Nbins)]
             for i in range(self.Nbins):
                 for j in range(i, self.Nbins):
@@ -281,7 +281,7 @@ class BmodeTomo(object):
             with joblib.parallel_backend("loky"):
                 
                 outputs = [self.single_run_cov(i, seeds[i]) for i in tqdm(np.arange(Nrands), desc = 'Make cov')]
-                final   = [0]*Nrands
+                final   = [0 for _ in range(Nrands)]
                 for o in outputs: final[o[0]] = o[1]
 
             return np.array(final)
@@ -295,7 +295,7 @@ class BmodeTomo(object):
                 outputs = [self.single_run_noise(i, seeds[i]) for i in tqdm(np.arange(Nrands), desc = 'Make Rands')]
             
                 
-                final   = [0]*Nrands
+                final   = [0 for _ in range(Nrands)]
                 for o in outputs: final[o[0]] = o[1]
 
             return np.array(final)
