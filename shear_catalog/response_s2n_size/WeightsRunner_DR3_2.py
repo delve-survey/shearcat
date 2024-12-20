@@ -48,18 +48,25 @@ with h5py.File('/project/chihway/data/decade/metacal_gold_combined_20241003.hdf'
     Flgs = f['mcal_flags'][:]
     for m in ['noshear', '1p', '1m', '2p', '2m']:
         
+        mag        = 30 - 2.5*np.log10(f[f'mcal_flux_{m}'][:])
         msk_here = (
-        (Flgs == 0) & 
-        (f[f'mcal_s2n_{m}'][:] > 10) & (f[f'mcal_s2n_{m}'][:] < 1000) & 
-        (f[f'mcal_T_{m}'][:] < 10) & 
-        (f[f'mcal_T_ratio_{m}'][:] > 0.5) & 
-        np.invert((f[f'mcal_T_{m}'][:] > 2) & (f[f'mcal_s2n_{m}'][:] < 30)) & 
-        np.invert((np.log10(f[f'mcal_T_{m}'][:]) < (22.25 - (30 - 2.5*np.log10(f[f'mcal_flux_{m}'][:, 0])))/3.5) & 
-                  (f[f'mcal_g_{m}'][:, 0]**2 + f[f'mcal_g_{m}'][:, 1]**2 > 0.8**2)
-                  )
+                (Flgs == 0) & 
+                (f[f'mcal_s2n_{m}'][:] > 10) & (f[f'mcal_s2n_{m}'][:] < 1000) & 
+                (f[f'mcal_T_{m}'][:] < 10) & 
+                (f[f'mcal_T_ratio_{m}'][:] > 0.5) & 
+                np.invert((f[f'mcal_T_{m}'][:] > 2) & (f[f'mcal_s2n_{m}'][:] < 30)) & 
+                np.invert((np.log10(f[f'mcal_T_{m}'][:]) < (22.25 - mag[:, 0])/3.5) & 
+                        (f[f'mcal_g_{m}'][:, 0]**2 + f[f'mcal_g_{m}'][:, 1]**2 > 0.8**2)
+                        )
                   )
         
-        msk_here = msk_here & GOLD & isld
+        mcal_pz_mask = ((mag[:,1] < 23.5) & (mag[:,1] > 18) &
+                        (mag[:,0] < 26)   & (mag[:,0] > 15) &
+                        (mag[:,2] < 26)   & (mag[:,2] > 15) &
+                        (mag[:,0] - mag[:,1] < 4)   & (mag[:,0] - mag[:,1] > -1.5) &
+                        (mag[:,1] - mag[:,2] < 4)   & (mag[:,1] - mag[:,2] > -1.5))
+        
+        msk_here = msk_here & GOLD & isld & mcal_pz_mask
         
         mask = mask | msk_here
 
@@ -67,18 +74,25 @@ with h5py.File('/project/chihway/data/decade/metacal_gold_combined_20241003.hdf'
 
     for m in ['noshear', '1p', '1m', '2p', '2m']:
 
+        mag        = 30 - 2.5*np.log10(f[f'mcal_flux_{m}'][:])
         msk_here = (
-            (Flgs == 0) & 
-            (f[f'mcal_s2n_{m}'][:] > 10) & (f[f'mcal_s2n_{m}'][:] < 1000) & 
-            (f[f'mcal_T_{m}'][:] < 10) & 
-            (f[f'mcal_T_ratio_{m}'][:] > 0.5) & 
-            np.invert((f[f'mcal_T_{m}'][:] > 2) & (f[f'mcal_s2n_{m}'][:] < 30)) & 
-            np.invert((np.log10(f[f'mcal_T_{m}'][:]) < (22.25 - (30 - 2.5*np.log10(f[f'mcal_flux_{m}'][:, 0])))/3.5) & 
-                    (f[f'mcal_g_{m}'][:, 0]**2 + f[f'mcal_g_{m}'][:, 1]**2 > 0.8**2)
-                    )
-                )
+                (Flgs == 0) & 
+                (f[f'mcal_s2n_{m}'][:] > 10) & (f[f'mcal_s2n_{m}'][:] < 1000) & 
+                (f[f'mcal_T_{m}'][:] < 10) & 
+                (f[f'mcal_T_ratio_{m}'][:] > 0.5) & 
+                np.invert((f[f'mcal_T_{m}'][:] > 2) & (f[f'mcal_s2n_{m}'][:] < 30)) & 
+                np.invert((np.log10(f[f'mcal_T_{m}'][:]) < (22.25 - mag[:, 0])/3.5) & 
+                        (f[f'mcal_g_{m}'][:, 0]**2 + f[f'mcal_g_{m}'][:, 1]**2 > 0.8**2)
+                        )
+                  )
         
-        msk_here = msk_here & GOLD & isld
+        mcal_pz_mask = ((mag[:,1] < 23.5) & (mag[:,1] > 18) &
+                        (mag[:,0] < 26)   & (mag[:,0] > 15) &
+                        (mag[:,2] < 26)   & (mag[:,2] > 15) &
+                        (mag[:,0] - mag[:,1] < 4)   & (mag[:,0] - mag[:,1] > -1.5) &
+                        (mag[:,1] - mag[:,2] < 4)   & (mag[:,1] - mag[:,2] > -1.5))
+        
+        msk_here = msk_here & GOLD & isld & mcal_pz_mask
 
         np.save(f'{base}_mask_{m}.npy', msk_here[mask])
 
