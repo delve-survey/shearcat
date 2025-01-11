@@ -122,7 +122,7 @@ if operation == 'footprint':
         ra = h5r['RA'][:]
         dec = h5r['DEC'][:]
 
-    island = np.invert(dec > np.where((310 < ra) & (ra < 350),
+    island = (dec > np.where((310 < ra) & (ra < 350),
                                             3.5,
                                             np.where(ra > 350,
                                                      (ra - 350) * (18 - 3.5)/(20) + 3.5,

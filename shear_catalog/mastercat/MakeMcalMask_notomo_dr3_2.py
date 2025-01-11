@@ -76,6 +76,10 @@ def get_baseline_mcal_mask():
         # (from here: https://des.ncsa.illinois.edu/releases/y3a2/Y3key-catalogs)
 
         mcal_mask = get_mcal_mask(size_ratio, s2n, T, mcal_flags, g1, g2, mag_r)
+        print(len(mcal_mask))
+        print(np.sum(mcal_mask))
+        print(s2n)
+        print(size_ratio)
 
         del size_ratio, s2n, T, mcal_flags, g1, g2, mag_r
 
