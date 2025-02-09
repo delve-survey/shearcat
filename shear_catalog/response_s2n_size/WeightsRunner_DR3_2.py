@@ -42,13 +42,13 @@ with h5py.File('/project/chihway/data/decade/metacal_gold_combined_20241003.hdf'
     
     #Get a mask of all objects that would be used
     mask = False
-    GOLD = hp.read_map('/project/chihway/dhayaa/DECADE/Foreground_Masks/GOLD_Ext0.2_Star5_MCs2.fits')
+    GOLD = hp.read_map('/project/chihway/dhayaa/DECADE/Foreground_Masks/GOLD_Ext0.2_Star5_MCs2_DESY6.fits')
     GOLD = GOLD[hp.ang2pix(4096, f['RA'][:], f['DEC'][:], lonlat = True)] == 0
     isld = de_island_ify(f['RA'][:], f['DEC'][:])
     Flgs = f['mcal_flags'][:]
     for m in ['noshear', '1p', '1m', '2p', '2m']:
         
-        mag        = 30 - 2.5*np.log10(f[f'mcal_flux_{m}'][:])
+        mag        = 30 - 2.5*np.log10(f[f'mcal_flux_{m}_dered_sfd98'][:])
         msk_here = (
                 (Flgs == 0) & 
                 (f[f'mcal_s2n_{m}'][:] > 10) & (f[f'mcal_s2n_{m}'][:] < 1000) & 
@@ -164,4 +164,4 @@ jobs    = [joblib.delayed(one_step)([SNR[i % N], SNR[i % N +1]], [Tr[i // N], Tr
 results = joblib.Parallel(n_jobs = -1, verbose = 10)(jobs)
 results = np.concatenate(results)
 
-np.save('./grid_quantities_20241219_DR3_2.npy', results)
+np.save('./grid_quantities_20250206_DR3_2.npy', results)
