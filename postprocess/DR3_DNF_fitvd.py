@@ -33,7 +33,11 @@ size = comm.Get_size()  # Total number of processes
 # STEP 1: POSITION MATCH FOR TRAINING
 ############################################
 
-SPECZ_sample = fitsio.read('/project/chihway/data/decade/BOSS_eBOSS.fits')
+# SPECZ_sample = fitsio.read('/project/chihway/data/decade/BOSS_eBOSS.fits')
+SPECZ_sample = pd.read_csv('/project2/chihway/dhayaa/DNF/Spec_z_sample.csv')
+SPECZ_sample = SPECZ_sample[SPECZ_sample['DEC'] > 35].reset_index(drop = True)
+
+print(f"STARTING WITH {len(SPECZ_sample)} SAMPLES")
 tree = BallTree(np.vstack([SPECZ_sample['DEC'], SPECZ_sample['RA']]).T * np.pi/180, leaf_size = 2, metric = "haversine")
 
 print("Load spec-z sample")
@@ -47,20 +51,16 @@ else:
 vds_file = file.replace('/project/chihway/data/decade/metacal_', '/scratch/midway3/dhayaa/random_metacal_')
 
 DATACOLUMNS  = ['COADD_OBJECT_ID', 'FLAGS_SG_BDF', 'FLAGS_FOREGROUND', 'FLAGS_FOOTPRINT', 'FLAGS_BAD_COLOR', 'RA', 'DEC']
+BANDS = 'GRIZ'
+DATACOLUMNS += [f'BDF_FLUX_{b}_DERED_SFD98' for b in BANDS]
+DATACOLUMNS += [f'BDF_FLUX_ERR_{b}_DERED_SFD98' for b in BANDS]
+DATACOLUMNS += [f'mcal_flux_noshear_dered_sfd98', 'mcal_flux_err_noshear_dered_sfd98']
 
-if args['FITVD']:
-    BANDS = 'GRIZ'
-    DATACOLUMNS += [f'BDF_FLUX_{b}_DERED_SFD98' for b in BANDS]
-    DATACOLUMNS += [f'BDF_FLUX_ERR_{b}_DERED_SFD98' for b in BANDS]
-
-elif args['METACAL']:
-    BANDS = 'GRIZ'
-    DATACOLUMNS += [f'mcal_flux_noshear_dered_sfd98']
-    DATACOLUMNS += [f'mcal_flux_err_noshear_dered_sfd98']
+DATACOLUMNS += ['BDF_S2N']
 
 if (rank == 0) or (rank == size - 1):
 
-    if os.path.isfile(vds_file):
+    if False: #os.path.isfile(vds_file):
         pass
     else:
         with h5py.File(file, 'r') as f:
@@ -90,8 +90,9 @@ with h5py.File(vds_file, 'r') as f:
     GLD = ((f['FLAGS_SG_BDF'][s] >= 2) & 
            (f['FLAGS_FOREGROUND'][s] == 0) & 
            (f['FLAGS_FOOTPRINT'][s] == (0 if '0209' in file else 1)) & 
-           (f['FLAGS_BAD_COLOR'][s] == 0)
-        )
+           (f['FLAGS_BAD_COLOR'][s] == 0) & 
+           (f['BDF_S2N'][s] > 5)
+           )
     
     ra  = f['RA'][s][GLD]
     dec = f['DEC'][s][GLD]
@@ -99,6 +100,7 @@ with h5py.File(vds_file, 'r') as f:
     if args['FITVD']:
         m   = 30 - 2.5 * np.log10([f[f'BDF_FLUX_{b}_DERED_SFD98'][s][GLD] for b in BANDS]).T
         dm  = 2.5/np.log(10) * np.array([f[f'BDF_FLUX_ERR_{b}_DERED_SFD98'][s][GLD] / f[f'BDF_FLUX_{b}_DERED_SFD98'][s][GLD] for b in BANDS]).T
+    
     elif args['METACAL']:
         m   = 30 - 2.5 * np.log10(f['mcal_flux_noshear_dered_sfd98'][s][GLD])
         dm  = 2.5/np.log(10) * np.array(f['mcal_flux_err_noshear_dered_sfd98'][s][GLD] / f['mcal_flux_noshear_dered_sfd98'][s][GLD])
@@ -215,7 +217,7 @@ target_mask   = np.all(np.isfinite(m), axis = 1) & np.all(np.isfinite(dm), axis 
 zbins = np.arange(0, 1.6, 0.01)
 inds  = np.random.default_rng(seed = rank).choice(train_mask.sum(), train_mask.sum(), replace = False)
 
-Nsize      = int(0.9*inds.size)
+Nsize      = int(0.5*inds.size)
 inds_train = inds[:Nsize]
 inds_test  = inds[Nsize:]
 Ntest      = len(inds_test)
