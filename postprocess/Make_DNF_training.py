@@ -58,5 +58,5 @@ Julia.to_csv('/project2/chihway/dhayaa/DNF/Spec_z_sample.csv', index = False)
 
 Julia = Julia[['RA', 'DEC', 'Z']]
 Julia = np.array(list(Julia.to_records(index=False)), dtype=[(col, Julia[col].dtype) for col in Julia.columns])
-Julia = Julia[Julia['DEC'] > 35]
+Julia = Julia[Julia['DEC'] < 40]
 np.save('/project2/chihway/dhayaa/DNF/DECCUT_Spec_z_sample.npy', Julia)
