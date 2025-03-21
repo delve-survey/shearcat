@@ -7,18 +7,22 @@ from tqdm import tqdm
 import joblib, os
 
 Julia = pd.read_csv('/project/chihway/dhayaa/DECADE/BRPORTAL_E_6315_18670.csv', low_memory = False)
+Julia = Julia[Julia.FLAG_DES == 4].reset_index(drop = True) #Same cuts as DES
 
 DESI  = []
-Names = ['BGS_ANY', 'ELGnotqso', 'LRG', 'QSO']
+Names = ['BGS_BRIGHT-21.5', 'ELG_LOPnotqso', 'LRG', 'QSO'] #Numbers match Table 2 of https://arxiv.org/pdf/2411.12020
 for n in Names:
-    paths = (glob.glob(f'/project2/chihway/dhayaa/DESI/{n}_N_clustering.dat.fits') + 
-             glob.glob(f'/project2/chihway/dhayaa/DESI/{n}_S_clustering.dat.fits'))
+    paths = (glob.glob(f'/project2/chihway/dhayaa/DESI/{n}_NGC_clustering.dat.fits') + 
+             glob.glob(f'/project2/chihway/dhayaa/DESI/{n}_SGC_clustering.dat.fits'))
+    
+    print(n, paths)
     for p in tqdm(paths, desc = n):
         X = fitsio.read(p)
         DESI.append(pd.DataFrame({'RA' : X['RA'], 'DEC' : X['DEC'], 'SOURCE' : 'DESI_' + n, 'Z' : X['Z']}))
     
 DESI = pd.concat(DESI, ignore_index = True)
 
+DESI = DESI[DESI.Z < 2.1].reset_index(drop = True) #Matches the cut z < 2.1 for QSOs in Table 2 here, https://arxiv.org/pdf/2411.12020
 Tree = BallTree(np.vstack([Julia['DEC'], Julia['RA']]).T * np.pi/180, leaf_size = 2, metric = "haversine")
 
 d = []
@@ -51,7 +55,12 @@ print(Julia['SOURCE'][j[d < 0.5]].value_counts())
 print(Julia['SOURCE'].value_counts())
 
 Julia = Julia.drop(index = np.unique(j[d < 0.5]).astype(int))
+Julia = Julia[Julia.SOURCE != 'VIPERS'] #Remove because used for validation in Porredon
+Julia = Julia[Julia.SOURCE != 'C3R2'] #Remove because we'll use it for validation (its only 3726 objects here. We have more in DR2, DR3)
+Julia = Julia.reset_index(drop = True) 
 Julia = pd.concat([Julia, DESI])
+
+print(Julia['SOURCE'].value_counts())
 
 Julia.to_csv('/project2/chihway/dhayaa/DNF/Spec_z_sample.csv', index = False)
 
