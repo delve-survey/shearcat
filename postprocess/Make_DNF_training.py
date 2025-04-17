@@ -49,12 +49,12 @@ for r in res:
 d = np.concatenate(d) * 180/np.pi * 60*60 #convert to arcsec
 j = np.concatenate(j)
 
-print(f"FOUND {np.sum(d < 0.5)} MATCHES")
+print(f"FOUND {np.sum(d < 1.0)} MATCHES")
 
-print(Julia['SOURCE'][j[d < 0.5]].value_counts())
+print(Julia['SOURCE'][j[d < 1.0]].value_counts())
 print(Julia['SOURCE'].value_counts())
 
-Julia = Julia.drop(index = np.unique(j[d < 0.5]).astype(int))
+Julia = Julia.drop(index = np.unique(j[d < 1.0]).astype(int))
 Julia = Julia[Julia.SOURCE != 'VIPERS'] #Remove because used for validation in Porredon
 Julia = Julia[Julia.SOURCE != 'C3R2'] #Remove because we'll use it for validation (its only 3726 objects here. We have more in DR2, DR3)
 Julia = Julia.reset_index(drop = True) 
